@@ -1,0 +1,105 @@
+name: Test Report
+
+on:
+  pull_request:
+    paths:
+      - "frontend/**"
+      - ".github/workflows/fe-vitest-report.yml"
+    types: [opened, synchronize]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  test-report:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # pnpm 설정 추가
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: 9 # 사용하는 pnpm 버전에 맞춰 수정 가능
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: "pnpm"
+          cache-dependency-path: frontend/pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run tests with HTML report
+        run: pnpm vitest run
+        env:
+          CI: true
+
+      - name: Upload test report as artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-report-${{ github.event.pull_request.number }}
+          path: frontend/html/
+          retention-days: 30
+
+      - name: Deploy report to GitHub Pages
+        if: always()
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./frontend/html
+          destination_dir: pr-${{ github.event.pull_request.number }}
+          keep_files: true
+
+      - name: Comment PR with report link
+        if: always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const marker = '';
+            const prNumber = context.payload.pull_request.number;
+            const reportUrl = `https://${context.repo.owner}.github.io/${context.repo.repo}/pr-${prNumber}/`;
+
+            const body = `${marker}
+            ## 🧪 Test Report
+
+            📊 **HTML Report**: ${reportUrl}
+
+            리포트에서 확인 가능:
+            - ✅ 통과/실패한 테스트 목록
+            - ⏱️ 각 테스트 실행 시간
+            - 📝 에러 로그 및 스택 트레이스
+
+            *Report generated at: ${new Date().toISOString()}*`;
+
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: prNumber,
+            });
+
+            const existing = comments.find(c => c.body.includes(marker));
+
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: prNumber,
+                body,
+              });
+            }
