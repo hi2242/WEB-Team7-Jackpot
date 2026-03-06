@@ -29,6 +29,7 @@ export default defineConfig({
     alias: {
       '@': path.resolve(dirname, 'src'),
       '@schema': path.resolve(dirname, 'src/types/schema.d.ts'),
+      '/images': path.resolve(dirname, 'public/images'),
     },
   },
 });
