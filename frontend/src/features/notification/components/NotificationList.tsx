@@ -1,5 +1,6 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 
+import { useVirtualizer } from '@tanstack/react-virtual';
 import { useNavigate } from 'react-router';
 
 import { getLabeledQnAListApi } from '@/features/notification/api/notificationApi';
@@ -13,7 +14,6 @@ import {
   useGetAllNotification,
   useReadEachNotification,
 } from '@/features/notification/hooks/useNotification';
-import { useScrollTouchEndObserver } from '@/features/notification/hooks/useScrollTouchEndObserver';
 import type { NotificationType } from '@/features/notification/types/notification';
 import { ApiError } from '@/shared/api/apiClient';
 import { queryClient } from '@/shared/hooks/queries/queryClient';
@@ -24,6 +24,8 @@ interface NotificationListProps {
 }
 
 const NotificationList = ({ handleDropdown }: NotificationListProps) => {
+  const parentRef = useRef<HTMLDivElement>(null);
+
   const {
     data: notificationListData,
     fetchNextPage,
@@ -31,15 +33,45 @@ const NotificationList = ({ handleDropdown }: NotificationListProps) => {
     isFetchingNextPage,
     isLoading,
   } = useGetAllNotification();
+
+  // 2차원 배열(pages)을 1차원 배열로 평탄화
+  const allNotifications = notificationListData
+    ? notificationListData.pages.flatMap((page) => page.notifications)
+    : [];
+
+  // 가상화 설정
+  const rowVirtualizer = useVirtualizer({
+    // 데이터 끝에 로딩 바를 위한 알림 아이템 1개
+    count: hasNextPage ? allNotifications.length + 1 : allNotifications.length,
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => 100,
+    overscan: 5,
+  });
+
+  const virtualItems = rowVirtualizer.getVirtualItems();
+
+  useEffect(() => {
+    const lastItem = virtualItems[virtualItems.length - 1];
+    if (!lastItem) return;
+
+    if (
+      lastItem.index >= allNotifications.length - 1 &&
+      hasNextPage &&
+      !isFetchingNextPage
+    ) {
+      fetchNextPage();
+    }
+  }, [
+    virtualItems,
+    hasNextPage,
+    isFetchingNextPage,
+    allNotifications.length,
+    fetchNextPage,
+  ]);
   const { showToast } = useToastMessageContext();
   const { mutateAsync: readEachNotification } = useReadEachNotification();
-  const { targetRef } = useScrollTouchEndObserver({
-    enabled: !!hasNextPage && !isFetchingNextPage,
-    onIntersect: () => fetchNextPage(),
-  });
-  const navigate = useNavigate();
 
-  useEffect(() => {});
+  const navigate = useNavigate();
 
   const handleNotificationClick = async (notification: NotificationType) => {
     const { id, type, meta } = notification;
@@ -99,29 +131,55 @@ const NotificationList = ({ handleDropdown }: NotificationListProps) => {
       </div>
     );
   }
-
   return (
-    <>
-      {notificationListData.pages.map((page, pageIndex) => (
-        <div key={pageIndex}>
-          {page.notifications.map((each: NotificationType) => (
-            <button
-              type='button'
-              onClick={() => handleNotificationClick(each)}
-              key={each.id}
-              className='w-full cursor-pointer rounded-md py-[0.875rem] text-left text-[0.813rem] font-medium text-gray-700 transition-colors duration-200 hover:bg-gray-50'
+    <div
+      ref={parentRef}
+      className='fixed-scroll-bar max-h-100 w-full overflow-y-auto px-1'
+    >
+      <div
+        style={{
+          height: `${rowVirtualizer.getTotalSize()}px`,
+          width: '100%',
+          position: 'relative',
+        }}
+      >
+        {virtualItems.map((virtualRow) => {
+          const isLoaderRow = virtualRow.index > allNotifications.length - 1;
+          const notification = allNotifications[virtualRow.index];
+
+          return (
+            <div
+              key={virtualRow.key}
+              data-index={virtualRow.index}
+              ref={rowVirtualizer.measureElement}
+              style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                width: '100%',
+                transform: `translateY(${virtualRow.start}px)`,
+              }}
             >
-              <NotificationItem data={each} />
-            </button>
-          ))}
-        </div>
-      ))}
-      <div ref={targetRef} className='flex h-4 items-center justify-center'>
-        {isFetchingNextPage && (
-          <span>{NOTIFICATION_MESSAGES.STATE.LOADING}</span>
-        )}
+              {isLoaderRow ? (
+                <div className='flex items-center justify-center text-gray-400'>
+                  {isFetchingNextPage
+                    ? NOTIFICATION_MESSAGES.STATE.LOADING
+                    : ''}
+                </div>
+              ) : (
+                <button
+                  type='button'
+                  onClick={() => handleNotificationClick(notification)}
+                  className='w-full cursor-pointer rounded-md py-[0.875rem] text-left transition-colors duration-200 hover:bg-gray-50'
+                >
+                  <NotificationItem data={notification} />
+                </button>
+              )}
+            </div>
+          );
+        })}
       </div>
-    </>
+    </div>
   );
 };
 
