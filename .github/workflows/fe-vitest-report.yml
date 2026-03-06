@@ -1,6 +1,13 @@
 name: Test Report
 
 on:
+  push:
+    branches:
+      - main
+    paths:
+      - "frontend/**"
+      - ".github/workflows/fe-vitest-report.yml"
+
   pull_request:
     paths:
       - "frontend/**"
