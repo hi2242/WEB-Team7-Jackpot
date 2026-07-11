@@ -1,12 +1,11 @@
 import Avatar from '@/features/coverLetter/components/reviewWithFriend/Avatar';
 import InvalidReviewBanner from '@/shared/components/InvalidReviewBanner';
-import PaperChipIcon from '@/shared/icons/PaperChipIcon';
-import PenToolIcon from '@/shared/icons/PenToolIcon';
+import * as SI from '@/shared/icons';
 import type { Review } from '@/shared/types/review';
 
 interface ReviewModalProps {
   review: Review | null;
-  initialRevision?: string;
+  initialSuggest?: string;
   initialComment?: string;
   onDelete?: (reviewId: number) => void;
   onToggleApproval?: (reviewId: number) => void;
@@ -14,15 +13,24 @@ interface ReviewModalProps {
 
 const ReviewModal = ({
   review,
-  initialRevision,
+  initialSuggest,
   initialComment,
   onDelete,
   onToggleApproval,
 }: ReviewModalProps) => {
   const viewStatus = review?.viewStatus ?? 'PENDING';
-  const showBanner = viewStatus !== 'PENDING';
-  const canApprove = !!review?.suggest && !!onToggleApproval;
+  const isPending = viewStatus === 'PENDING';
   const isAccepted = viewStatus === 'ACCEPTED';
+  const hasToggleAction = !!review?.suggest && !!onToggleApproval;
+  const canApply = hasToggleAction && isPending;
+  const canRevert =
+    hasToggleAction && isAccepted && review?.isApproved === true;
+  const displayOriginText = isAccepted
+    ? (review?.suggest ?? review?.originText ?? '')
+    : (review?.originText ?? '');
+  const displaySuggest = isAccepted
+    ? (review?.originText ?? '')
+    : (initialSuggest ?? '');
 
   return (
     <div className='flex w-96 flex-col items-end gap-4 rounded-[32px] bg-white p-5 shadow-[0px_0px_30px_0px_rgba(41,41,41,0.06)]'>
@@ -37,30 +45,30 @@ const ReviewModal = ({
             </div>
           </div>
         </div>
-        {showBanner && review && (
+        {!isPending && review && (
           <InvalidReviewBanner
             viewStatus={viewStatus}
             isExpanded={true}
-            originText={review.selectedText}
+            originText={displayOriginText}
           />
         )}
         <div className='flex flex-col items-start justify-start gap-4 self-stretch'>
           <div className='flex flex-col items-start justify-start gap-1 self-stretch'>
             <div className='inline-flex items-center justify-center gap-1.5'>
-              <PaperChipIcon />
+              <SI.PaperChipIcon />
               <div className='text-Semantic-text-headline justify-start text-base leading-6 font-bold'>
                 수정
               </div>
             </div>
             <div className='inline-flex items-center justify-center gap-2.5 self-stretch pl-6'>
               <div className='text-Primitive-Color-gray-gray-800 flex-1 justify-start text-sm leading-5 font-normal'>
-                {initialRevision}
+                {displaySuggest}
               </div>
             </div>
           </div>
           <div className='flex flex-col items-start justify-start gap-1 self-stretch'>
             <div className='inline-flex items-center justify-center gap-1.5'>
-              <PenToolIcon />
+              <SI.PenToolIcon />
               <div className='text-Semantic-text-headline justify-start text-base leading-6 font-bold'>
                 코멘트
               </div>
@@ -76,10 +84,10 @@ const ReviewModal = ({
       <div className='inline-flex items-center justify-between self-stretch'>
         <div className='flex items-center justify-start gap-1.5'>
           <div className='flex h-7 w-7 items-center justify-center gap-1 rounded-[100px] bg-red-50 px-2 py-[5px]'>
-            <PaperChipIcon />
+            <SI.PaperChipIcon />
           </div>
           <div className='flex h-7 w-7 items-center justify-center gap-1 rounded-[100px] bg-blue-50 px-2 py-[5px]'>
-            <PenToolIcon />
+            <SI.PenToolIcon />
           </div>
         </div>
         <div className='flex items-center justify-start gap-2'>
@@ -94,18 +102,14 @@ const ReviewModal = ({
               </span>
             </button>
           )}
-          {canApprove && (
+          {(canApply || canRevert) && (
             <button
               type='button'
-              className={`flex cursor-pointer items-center justify-start gap-1 rounded-xl px-3 py-1.5 ${
-                isAccepted
-                  ? 'bg-yellow-500 text-white'
-                  : 'bg-gray-900 text-white'
-              }`}
-              onClick={() => review && onToggleApproval(review.id)}
+              className='flex cursor-pointer items-center justify-start gap-1 rounded-xl bg-gray-900 px-3 py-1.5 text-white'
+              onClick={() => review && onToggleApproval?.(review.id)}
             >
               <span className='text-center text-sm leading-5 font-bold'>
-                {isAccepted ? '되돌리기' : '적용하기'}
+                {canApply ? '적용하기' : '되돌리기'}
               </span>
             </button>
           )}

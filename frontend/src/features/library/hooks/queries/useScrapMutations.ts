@@ -1,7 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 
-import { createScrap, deleteScrap } from '@/features/library/api';
-import { scrapNumKeys } from '@/features/library/hooks/queries/keys';
+import { createScrap } from '@/features/library/api';
+import { scrapNumKeys } from '@/shared/hooks/queries/scrapKeys';
 
 // 스크랩 생성 뮤테이션 훅
 export const useCreateScrapMutation = () => {
@@ -9,26 +9,10 @@ export const useCreateScrapMutation = () => {
 
   return useMutation({
     mutationFn: (qnAId: number) => createScrap({ qnAId }),
-    onSuccess: () => {
+    onSuccess: (_data, qnAId) => {
       queryClient.invalidateQueries({ queryKey: scrapNumKeys.all });
-    },
-    onError: (error) => {
-      console.error('스크랩 생성 실패:', error);
-    },
-  });
-};
-
-// 스크랩 삭제 뮤테이션 훅
-export const useDeleteScrapMutation = () => {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: (qnAId: number) => deleteScrap(qnAId),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: scrapNumKeys.all });
-    },
-    onError: (error) => {
-      console.error('스크랩 삭제 실패:', error);
+      queryClient.invalidateQueries({ queryKey: ['qna', qnAId] });
+      queryClient.invalidateQueries({ queryKey: ['coverletter', 'scrap'] });
     },
   });
 };

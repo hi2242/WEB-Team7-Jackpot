@@ -17,7 +17,7 @@ const CoverLetterPreview = ({
   return (
     <Link
       to={`/cover-letter/edit/${data.coverLetterId}`}
-      className={`${isCoverLetter ? 'h-[11.25rem]' : ''} flex flex-1 cursor-pointer items-center justify-start gap-9 rounded-2xl py-6 pr-6 pl-9 outline outline-1 outline-offset-[-1px] outline-gray-100`}
+      className={`focusable-card ${isCoverLetter ? 'h-[11.25rem]' : ''} hover-float-up flex flex-1 cursor-pointer items-center justify-start gap-9 rounded-2xl border border-gray-100 py-6 pr-6 pl-9`}
     >
       <img src={fileIcon} className='h-16 w-14' alt='' aria-hidden='true' />
       <div className='inline-flex flex-1 flex-col items-start justify-start gap-2'>
@@ -39,19 +39,15 @@ const CoverLetterPreview = ({
           </div>
         </div>
 
-        {isCoverLetter && (
-          <div className='text-caption-l line-clamp-2 h-10 max-h-14 justify-start self-stretch font-normal text-gray-400'>
-            {/* TODO: 백엔드 API에서 previewText 제공 시 표시 */}
-            {/* 현재는 API 응답에 답변 미리보기가 없어서 임시로 빈 상태 */}
-          </div>
-        )}
         <div className='flex flex-row items-center justify-between self-stretch'>
           <div className='text-caption-l font-normal text-gray-400'>
             총 {data.questionCount}문항
           </div>
-          <div className='text-caption-l font-normal text-gray-400'>
-            {getDate(data.deadline)}
-          </div>
+          {data.deadline && (
+            <div className='text-caption-l font-normal text-gray-400'>
+              {getDate(data.deadline)}
+            </div>
+          )}
         </div>
       </div>
     </Link>

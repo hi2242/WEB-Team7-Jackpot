@@ -1,4 +1,7 @@
-export type LibraryView = 'COMPANY' | 'QUESTION';
+import type { Category } from '@/shared/types/coverLetter';
+import type { LibraryView } from '@/shared/types/library';
+
+export type { LibraryView };
 
 export interface LibraryResponse {
   libraries: string[];
@@ -6,11 +9,11 @@ export interface LibraryResponse {
 
 export interface CoverLetterItem {
   id: number;
-  applySeason?: string;
+  applySeason: string | null;
   companyName: string;
   jobPosition: string;
   questionCount: number;
-  modifiedAt: string; // [박소민] TODO: 타입 유효성 검사
+  modifiedAt: string;
 }
 
 export type DocumentListResponse =
@@ -26,14 +29,14 @@ export interface QuestionItem {
   id: number;
   companyName: string;
   jobPosition: string;
-  applySeason: string; // "2024 상반기" 형식
+  applySeason: string | null; // "2024 상반기" 형식 (null 허용)
   question: string;
   answer: string | null;
   coverLetterId: number;
 }
 
 export interface QuestionListResponse {
-  questionCategory: string;
+  questionCategoryType: Category | null; // 카테고리 선택 안 한 경우 null
   qnAs: QuestionItem[];
   hasNext: boolean;
 }
@@ -55,6 +58,17 @@ export interface QnASearchResponse {
   libraryCount: number;
   libraries: string[];
   qnACount: number;
-  qnAs: QuestionItem[];
+  qnAs: QnAsSearchResponse[];
   hasNext: boolean;
+}
+
+export interface QnAsSearchResponse {
+  qnAId: number;
+  companyName: string;
+  jobPosition: string;
+  applySeason: string | null;
+  question: string;
+  answer: string | null;
+  coverLetterId: number;
+  questionCategoryType: Category | null;
 }

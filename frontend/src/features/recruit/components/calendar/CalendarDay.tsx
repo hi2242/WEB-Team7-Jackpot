@@ -1,9 +1,8 @@
-// [박소민] TODO: NavLink로 변경하는 것 알아보기
 import { memo } from 'react';
 
 import { Link } from 'react-router';
 
-import type { CalendarCoverLetterItem } from '@/features/recruit/types';
+import type { CalendarCoverLetterItem } from '@/shared/types/coverLetter';
 import { isBeforeDay } from '@/shared/utils/dates';
 
 interface Props {
@@ -38,7 +37,7 @@ const CalendarDay = ({
   return (
     <Link
       to={targetPath}
-      className={`inline-flex h-28 w-28 cursor-pointer flex-col items-start justify-start gap-2 rounded-lg p-1 transition-colors hover:bg-gray-50`}
+      className='inline-flex h-26 w-26 cursor-pointer flex-col items-start justify-start gap-2 rounded-lg p-1 transition-colors duration-200 hover:bg-gray-50'
     >
       <div className='inline-flex items-center justify-start self-stretch'>
         <div className='flex flex-1 items-center justify-between gap-2'>

@@ -1,8 +1,7 @@
 import Question from '@/shared/components/Question';
-import { PlusIcon } from '@/shared/icons/Plus';
+import * as SI from '@/shared/icons';
 import type { CoverLetterQuestion } from '@/shared/types/coverLetter';
 
-// [박소민] TODO: 자기소개서 질문이 1개일 경우 삭제 버튼 숨김, 2개 이상일 때 삭제 버튼 보이도록 변경 예정
 interface Props {
   questions: CoverLetterQuestion[];
   onQuestionsChange: (newQuestions: CoverLetterQuestion[]) => void;
@@ -22,7 +21,6 @@ const QuestionsSection = ({ questions, onQuestionsChange }: Props) => {
     onQuestionsChange(nextQuestions);
   };
 
-  // key의 타입을 keyof CoverLetterQuestion으로
   const updateQuestion = (
     index: number,
     key: keyof CoverLetterQuestion,
@@ -34,9 +32,9 @@ const QuestionsSection = ({ questions, onQuestionsChange }: Props) => {
   };
 
   return (
-    <div className='flex w-full flex-col items-start justify-start gap-4 self-stretch'>
-      <div className='flex flex-col items-start justify-start gap-3 self-stretch'>
-        <div className='inline-flex items-start justify-start gap-3 self-stretch'>
+    <div className='flex w-full flex-col items-start justify-start gap-4'>
+      <div className='flex flex-col items-start justify-start gap-3'>
+        <div className='inline-flex items-start justify-start gap-3'>
           <div className='flex flex-1 items-center justify-start gap-0.5'>
             <div className='text-title-s justify-start font-bold text-gray-950'>
               자기소개서 질문
@@ -53,7 +51,10 @@ const QuestionsSection = ({ questions, onQuestionsChange }: Props) => {
           key={index}
           displayIndex={index + 1}
           data={q}
-          onRemove={() => removeQuestion(index)}
+          // 배열의 길이가 1보다 클 때만 삭제 가능
+          onRemove={
+            questions.length > 1 ? () => removeQuestion(index) : undefined
+          }
           onChange={(key: keyof CoverLetterQuestion, val: string) =>
             updateQuestion(index, key, val)
           }
@@ -63,10 +64,10 @@ const QuestionsSection = ({ questions, onQuestionsChange }: Props) => {
       <button
         type='button'
         onClick={addQuestion}
-        className='inline-flex cursor-pointer items-center justify-center gap-1.5 self-stretch rounded-lg py-3 pr-5 pl-4 outline outline-1 outline-offset-[-1px] outline-gray-100 transition-colors hover:bg-gray-50'
+        className='inline-flex w-full cursor-pointer items-center justify-center gap-1.5 rounded-lg py-3 pr-5 pl-4 outline outline-1 outline-offset-[-1px] outline-gray-100 transition-colors hover:bg-gray-50'
       >
         <div className='relative h-6 w-6'>
-          <PlusIcon className='text-gray-300' />
+          <SI.PlusIcon className='text-gray-300' />
         </div>
         <div className='text-body-m justify-start text-center font-bold text-gray-300'>
           새 문항 등록하기

@@ -1,46 +1,39 @@
 import TabButton from '@/features/upload/components/TabButton';
 import { UPLOAD_TAB_DATA } from '@/features/upload/constants/uploadPage';
-import { MAX_BYTES } from '@/features/upload/constants/uploadPage';
-import { UploadPageIcons as I } from '@/features/upload/icons';
-import { formatFileSize } from '@/features/upload/utils/formatFileSize';
+import * as UI from '@/features/upload/icons';
 
 interface UploadInputHeaderProps {
-  totalSize: number;
   isContent: boolean;
   nextStep: () => void;
 }
 
-const UploadInputHeader = ({
-  isContent,
-  totalSize,
-  nextStep,
-}: UploadInputHeaderProps) => {
-  const isOverSize = !!totalSize && totalSize > MAX_BYTES;
-  const canLabeling = isContent && !isOverSize;
+const UploadInputHeader = ({ isContent, nextStep }: UploadInputHeaderProps) => {
+  const canLabeling = isContent;
 
   return (
     <div className='flex items-center justify-between'>
-      <div className='flex items-center'>
+      <div className='flex items-center gap-2'>
         <TabButton
           icon={UPLOAD_TAB_DATA[0].icon}
           label={UPLOAD_TAB_DATA[0].label}
         />
+        <a
+          href='/files/coverLetterSamples.zip'
+          download='자기소개서 샘플 압축.zip'
+          className='flex items-center gap-[0.375rem] rounded-lg bg-gray-50 px-[1.125rem] py-3 text-gray-600 transition-colors hover:bg-gray-100'
+        >
+          {UPLOAD_TAB_DATA[1].icon}
+          <div className='font-bold'>{UPLOAD_TAB_DATA[1].label}</div>
+        </a>
       </div>
-      <div className='flex items-center gap-6'>
-        <div className='flex items-center gap-1 text-gray-400 select-none'>
-          <span className={isOverSize ? 'text-red-600' : ''}>
-            {formatFileSize(totalSize ?? 0)}
-          </span>
-          <span>/</span>
-          <span>10MB</span>
-        </div>
 
+      <div className='flex items-center gap-6'>
         <button
-          className='text-title-s flex cursor-pointer gap-[0.375rem] rounded-lg bg-gray-900 px-[1.125rem] py-3 font-bold text-white disabled:cursor-default disabled:bg-gray-50 disabled:text-gray-400'
+          className='text-title-s flex cursor-pointer gap-[0.375rem] rounded-lg bg-gray-900 px-[1.125rem] py-3 font-bold text-white transition-colors duration-200 hover:bg-gray-700 disabled:cursor-default disabled:bg-gray-50 disabled:text-gray-400'
           onClick={nextStep}
           disabled={!canLabeling}
         >
-          <I.AILabelingIcon
+          <UI.AILabelingIcon
             color={canLabeling ? 'white' : 'var(--color-gray-300)'}
             size='24'
           />

@@ -3,16 +3,16 @@ import { useState } from 'react';
 import Deadline from '@/shared/components/Deadline';
 import LabeledSelectInput from '@/shared/components/LabeledSelectInput';
 import RecruitPeriodSelectInput from '@/shared/components/RecruitPeriodSelectInput';
-import type {
-  ApiApplyHalf,
-  CreateCoverLetterRequest,
-} from '@/shared/types/coverLetter';
+import { DEFAULT_APPLY_HALF } from '@/shared/constants/createCoverLetter';
+import {
+  useGetCompanies,
+  useGetJobPositions,
+} from '@/shared/hooks/coverLetterInformationQueries';
+import * as SI from '@/shared/icons';
+import type { CreateCoverLetterRequest } from '@/shared/types/coverLetter';
 import type { DropdownStateType } from '@/shared/types/dropdown';
 import { generateYearList } from '@/shared/utils/dates';
 
-// [박소민] TODO: 상의 후 정하기
-const COMPANY_NAME_LIST = ['삼성전자', 'SK하이닉스', '네이버'];
-const JOB_POSITION_LIST = ['개발자', '기획자', '디자이너'];
 const yearList = generateYearList(new Date().getFullYear());
 
 interface Props {
@@ -24,6 +24,16 @@ interface Props {
 }
 
 const RecruitDetail = ({ formData, onUpdate }: Props) => {
+  const {
+    data: companyList,
+    isLoading: isGetCompanyListLoading,
+    isError: isGetCompanyListError,
+  } = useGetCompanies();
+  const {
+    data: jobPositionList,
+    isLoading: isGetJobPositionListLoading,
+    isError: isGetJobPositionListError,
+  } = useGetJobPositions();
   const [isDropdownOpen, setIsDropdownOpen] = useState<DropdownStateType>({
     companyNameDropdown: false,
     jobPositionDropdown: false,
@@ -31,18 +41,27 @@ const RecruitDetail = ({ formData, onUpdate }: Props) => {
     questionTypeDropdown: false,
   });
 
+  // 드롭다운 상태를 토글하는 단일 핸들러 (유지보수 포인트)
   const toggleDropdown = (key: keyof DropdownStateType, isOpen: boolean) => {
     setIsDropdownOpen((prev) => ({ ...prev, [key]: isOpen }));
   };
 
+  if (isGetCompanyListLoading || isGetJobPositionListLoading) {
+    return <div>기업명 또는 직무명 로딩 중...</div>;
+  }
+
+  if (isGetCompanyListError || isGetJobPositionListError) {
+    return <div>데이터를 찾을 수 없습니다.</div>;
+  }
+
   return (
-    <div className='flex w-full flex-col gap-5'>
+    <div className='flex flex-col gap-4'>
       <LabeledSelectInput
         label='기업명'
         name='companyName'
         value={formData.companyName}
         onChange={(val) => onUpdate('companyName', val)}
-        constantData={COMPANY_NAME_LIST}
+        constantData={companyList}
         handleDropdown={(isOpen) =>
           toggleDropdown('companyNameDropdown', isOpen)
         }
@@ -55,7 +74,7 @@ const RecruitDetail = ({ formData, onUpdate }: Props) => {
         name='jobPosition'
         value={formData.jobPosition}
         onChange={(val) => onUpdate('jobPosition', val)}
-        constantData={JOB_POSITION_LIST}
+        constantData={jobPositionList}
         handleDropdown={(isOpen) =>
           toggleDropdown('jobPositionDropdown', isOpen)
         }
@@ -65,14 +84,15 @@ const RecruitDetail = ({ formData, onUpdate }: Props) => {
 
       <RecruitPeriodSelectInput
         label='채용 시기'
-        yearValue={formData.applyYear}
-        seasonValue={formData.applyHalf}
+        yearValue={formData.applyYear ?? new Date().getFullYear()}
+        seasonValue={formData.applyHalf ?? DEFAULT_APPLY_HALF}
         onChangeYear={(val) => onUpdate('applyYear', val)}
-        onChangeSeason={(val: ApiApplyHalf) => onUpdate('applyHalf', val)}
+        onChangeSeason={(val) => onUpdate('applyHalf', val)}
         constantData={yearList}
         handleDropdown={(isOpen) => toggleDropdown('yearDropdown', isOpen)}
         isOpen={isDropdownOpen.yearDropdown}
         dropdownDirection='bottom'
+        icon={<SI.DropdownArrow isOpen={isDropdownOpen.yearDropdown} />}
       />
 
       <Deadline

@@ -27,7 +27,7 @@ export const collectText = (root: Node): string => {
     node.childNodes.forEach(walk);
   };
   root.childNodes.forEach(walk);
-  return result.replace(/\u200B/g, '');
+  return result.replace(/[\u200B\u2060]/g, '');
 };
 
 /**
@@ -63,10 +63,49 @@ export const getCaretPosition = (
   return { start, end };
 };
 
+/**
+ * data-chunk 속성이 없는 비정상 자식 노드(텍스트 노드, 래핑되지 않은 엘리먼트)를
+ * contentEditable div에서 제거하거나 언래핑한다.
+ * caret 복원 useLayoutEffect에서 React 렌더 사이클 외부에서 DOM이 오염됐을 때 정리하는 용도.
+ */
+export const cleanupNonChunkNodes = (el: HTMLElement): void => {
+  const children = Array.from(el.childNodes);
+  for (const child of children) {
+    if (
+      child.nodeType === Node.TEXT_NODE ||
+      (child.nodeType === Node.ELEMENT_NODE &&
+        !(child as Element).hasAttribute('data-chunk'))
+    ) {
+      if (child.nodeType === Node.ELEMENT_NODE) {
+        while (child.firstChild) {
+          el.insertBefore(child.firstChild, child);
+        }
+        el.removeChild(child);
+      } else {
+        el.removeChild(child);
+      }
+    }
+  }
+};
+
 // caret 복원
 export const restoreCaret = (el: HTMLElement, offset: number) => {
   const sel = window.getSelection();
   if (!sel) return;
+
+  const findReviewWrapper = (node: Node): HTMLElement | null => {
+    let current: Node | null = node;
+    while (current && current !== el) {
+      if (
+        current.nodeType === Node.ELEMENT_NODE &&
+        (current as HTMLElement).hasAttribute('data-review-id')
+      ) {
+        return current as HTMLElement;
+      }
+      current = current.parentNode;
+    }
+    return null;
+  };
 
   const walker = document.createTreeWalker(
     el,
@@ -91,17 +130,39 @@ export const restoreCaret = (el: HTMLElement, offset: number) => {
 
     if (node.nodeType === Node.TEXT_NODE) {
       const nodeText = node.textContent || '';
-      const zwspCount = (nodeText.match(/\u200B/g) || []).length;
-      const actualLength = nodeText.length - zwspCount;
+      const hiddenCount = (nodeText.match(/[\u200B\u2060]/g) || []).length;
+      const actualLength = nodeText.length - hiddenCount;
 
       if (remaining <= actualLength) {
         let realOffset = 0;
         let virtualCount = 0;
         while (virtualCount < remaining && realOffset < nodeText.length) {
-          if (nodeText[realOffset] !== '\u200B') virtualCount++;
+          if (
+            nodeText[realOffset] !== '\u200B' &&
+            nodeText[realOffset] !== '\u2060'
+          ) {
+            virtualCount++;
+          }
           realOffset++;
         }
         const range = document.createRange();
+        // 리뷰 텍스트의 끝 경계에 캐럿이 걸리면, outer contentEditable=false 그룹 wrapper
+        // 바깥(부모 editable div)으로 커서를 이동시킨다.
+        // inner review-wrap(data-review-id) 뒤에 커서를 두면 outer contentEditable=false 내부에
+        // 위치하게 되어 커서가 비활성화(deactivated)되는 문제가 발생하기 때문이다.
+        if (remaining === actualLength) {
+          const reviewWrapper = findReviewWrapper(node);
+          if (reviewWrapper) {
+            const reviewGroupWrapper =
+              reviewWrapper.closest<HTMLElement>('[data-review-group]') ??
+              reviewWrapper;
+            range.setStartAfter(reviewGroupWrapper);
+            range.collapse(true);
+            sel.removeAllRanges();
+            sel.addRange(range);
+            return;
+          }
+        }
         range.setStart(node, realOffset);
         range.collapse(true);
         sel.removeAllRanges();

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 
+import { AUTH_FORM, AUTH_MESSAGES } from '@/features/auth/constants';
 import {
   useCheckId,
   useLogin,
@@ -25,9 +26,9 @@ interface UseSignUpProps {
 }
 
 export const useSignUp = ({ handleSuccess }: UseSignUpProps) => {
-  const { mutateAsync: checkId } = useCheckId();
-  const { mutateAsync: signUp } = useSignUpMutation();
-  const { mutateAsync: login } = useLogin();
+  const { mutateAsync: checkId, isPending: isCheckingId } = useCheckId();
+  const { mutateAsync: signUp, isPending: isSigningUp } = useSignUpMutation();
+  const { mutateAsync: login, isPending: isLoggingIn } = useLogin();
   const [isSignUpFailed, setIsSignUpFailed] = useState<boolean>(false);
   const { showToast } = useToastMessageContext();
   const { formData, handleInputChange: originalHandleInputChange } =
@@ -49,11 +50,13 @@ export const useSignUp = ({ handleSuccess }: UseSignUpProps) => {
   const [isIdDuplicationVerified, setIsIdDuplicationVerified] =
     useState<boolean>(false);
 
+  const isPending = isCheckingId || isSigningUp || isLoggingIn;
+
   const handleInputChange =
     (key: AuthInputKey) => (e: React.ChangeEvent<HTMLInputElement>) => {
       if (isSignUpFailed) setIsSignUpFailed(false);
       originalHandleInputChange(key)(e);
-      if (key === 'userId') setIsIdDuplicationVerified(false);
+      if (key === AUTH_FORM.FIELDS.USER_ID) setIsIdDuplicationVerified(false);
     };
 
   const handleCheckDuplicateId = async () => {
@@ -65,13 +68,13 @@ export const useSignUp = ({ handleSuccess }: UseSignUpProps) => {
       setIsIdDuplicationVerified(true);
       setStatusMsg((prev) => ({
         ...prev,
-        userId: '사용 가능한 아이디입니다.',
+        userId: AUTH_MESSAGES.VALIDATION.ID_AVAILABLE,
       }));
     } catch {
       setIsIdDuplicationVerified(false);
       setStatusMsg((prev) => ({
         ...prev,
-        userId: '이미 사용 중인 아이디입니다.',
+        userId: AUTH_MESSAGES.VALIDATION.ID_DUPLICATED,
       }));
     }
   };
@@ -80,7 +83,7 @@ export const useSignUp = ({ handleSuccess }: UseSignUpProps) => {
     e.preventDefault();
 
     if (!isIdDuplicationVerified) {
-      showToast('아이디 중복 확인을 해주세요.', false);
+      showToast(AUTH_MESSAGES.VALIDATION.ID_CHECK_REQUIRED, false);
       return;
     }
 
@@ -97,14 +100,13 @@ export const useSignUp = ({ handleSuccess }: UseSignUpProps) => {
         password: formData.password,
       });
 
-      showToast('회원가입 및 로그인이 완료되었습니다.', true);
+      showToast(AUTH_MESSAGES.SIGNUP.SUCCESS_ALL, true);
       handleSuccess(true);
     } catch (error) {
       if (error instanceof Error) {
         setIsSignUpFailed(true);
       } else {
-        console.error('SignUp or Auto-Login Error', error);
-        showToast('회원가입 또는 로그인 중 오류가 발생했습니다.', false);
+        showToast(AUTH_MESSAGES.SIGNUP.ERROR, false);
       }
     }
   };
@@ -144,5 +146,6 @@ export const useSignUp = ({ handleSuccess }: UseSignUpProps) => {
     formData: formData,
     handleCheckDuplicateId: handleCheckDuplicateId,
     isActived: isActived,
+    isPending: isPending,
   };
 };

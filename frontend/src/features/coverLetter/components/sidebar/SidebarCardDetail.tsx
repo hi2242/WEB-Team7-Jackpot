@@ -1,6 +1,6 @@
-import FileDocument from '@/features/coverLetter/icons/FileDocument';
-import type { ScrapItem } from '@/features/coverLetter/types/coverLetter';
-import RightArrow from '@/shared/icons/RightArrow';
+import * as CI from '@/features/coverLetter/icons';
+import * as SI from '@/shared/icons';
+import type { ScrapItem } from '@/shared/types/coverLetter';
 
 interface CardDetailProps {
   scrap: ScrapItem;
@@ -14,17 +14,19 @@ const SidebarCardDetail = ({ scrap, onBack }: CardDetailProps) => {
     <div className='flex h-full w-full flex-col items-center gap-3'>
       <div className='flex shrink-0 flex-col gap-5 self-stretch'>
         <div className='flex w-full flex-col gap-1'>
-          <div className='inline-flex items-center gap-1 self-stretch px-3'>
+          <div
+            onClick={onBack}
+            aria-label='뒤로가기'
+            className='inline-flex cursor-pointer items-center gap-1 self-stretch rounded-lg px-3 py-2 hover:bg-gray-100'
+          >
             <button
               type='button'
-              onClick={onBack}
               className='flex h-7 w-7 cursor-pointer items-center justify-center'
-              aria-label='뒤로가기'
             >
-              <RightArrow className='rotate-180' />
+              <SI.RightArrow className='rotate-180' />
             </button>
             <div className='flex flex-1 items-center gap-2'>
-              <FileDocument />
+              <CI.FileDocument />
               <div className='line-clamp-1 flex-1 text-lg leading-7 font-bold text-gray-950'>
                 {applySeason} {companyName}
               </div>
@@ -48,11 +50,13 @@ const SidebarCardDetail = ({ scrap, onBack }: CardDetailProps) => {
                     {jobPosition}
                   </div>
                 </div>
-                <div className='flex items-center justify-center gap-1 rounded-xl bg-gray-50 px-3 py-1.5'>
-                  <div className='text-xs leading-4 font-medium text-gray-600'>
-                    {applySeason}
+                {applySeason && (
+                  <div className='flex items-center justify-center gap-1 rounded-xl bg-gray-50 px-3 py-1.5'>
+                    <div className='text-xs leading-4 font-medium text-gray-600'>
+                      {applySeason}
+                    </div>
                   </div>
-                </div>
+                )}
               </div>
             </div>
 
@@ -69,7 +73,7 @@ const SidebarCardDetail = ({ scrap, onBack }: CardDetailProps) => {
 
             <div className='inline-flex items-center gap-0.5'>
               <div className='text-sm leading-5 font-medium text-gray-400'>
-                {answer.length}자
+                {answer && `${answer.length}자`}
               </div>
             </div>
           </div>

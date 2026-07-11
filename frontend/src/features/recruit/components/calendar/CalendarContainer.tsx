@@ -1,4 +1,3 @@
-// [박소민] TODO: 무한 스크롤 확인하기
 import { useEffect, useMemo } from 'react';
 
 import Calendar from '@/features/recruit/components/calendar/Calendar';
@@ -17,8 +16,7 @@ const CalendarContainer = () => {
     useInfiniteCalendarDates({
       startDate: startDateStr,
       endDate: endDateStr,
-      size: 100,
-      isShared: false,
+      size: 100, // 한 달 치 데이터로는 충분히 넉넉한 사이즈
     });
 
   useEffect(() => {
@@ -35,7 +33,6 @@ const CalendarContainer = () => {
 
     allItems.forEach((item) => {
       const dateKey = getISODate(item.deadline);
-
       if (!dateKey) return;
 
       if (!map[dateKey]) {

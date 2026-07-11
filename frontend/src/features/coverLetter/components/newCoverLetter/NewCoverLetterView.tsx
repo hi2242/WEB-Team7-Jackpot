@@ -1,13 +1,11 @@
 import { useMemo } from 'react';
 
 import NewCoverLetterDetail from '@/features/coverLetter/components/newCoverLetter/NewCoverLetterDetail';
-import { NewCoverLetterIcon } from '@/features/coverLetter/icons/NewCoverLetter';
+import * as CI from '@/features/coverLetter/icons';
 import QuestionsSection from '@/shared/components/QuestionsSection';
 import type { CreateCoverLetterRequest } from '@/shared/types/coverLetter';
 import { isQuestionsValid } from '@/shared/utils/coverLetter';
 
-// [박소민] TODO: RecruitFormView와 유사한 구조로 변경 예정, 우선은 디자인 시안에 맞춰 단일 컴포넌트로 구현
-// [박소민] TODO: 카테고리 유효성 검사 추가
 interface Props {
   formData: CreateCoverLetterRequest;
   onChange: <K extends keyof CreateCoverLetterRequest>(
@@ -51,7 +49,7 @@ const NewCoverLetterView = ({ formData, onChange, onSubmit }: Props) => {
       <div className='flex items-center justify-between self-stretch'>
         <div className='flex items-center justify-start gap-2'>
           <div className='m-auto h-8 w-8 overflow-hidden'>
-            <NewCoverLetterIcon />
+            <CI.NewCoverLetterIcon />
           </div>
           <div className='text-title-m justify-start font-bold text-gray-950'>
             새 자기소개서 등록

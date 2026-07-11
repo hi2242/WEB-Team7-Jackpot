@@ -4,7 +4,7 @@ import ActionButtons from '@/features/review/components/review/ActionButtons';
 import CardContentSection from '@/features/review/components/review/CardContentSection';
 import CardUserInfo from '@/features/review/components/review/CardUserInfo';
 import ChipRow from '@/features/review/components/review/ChipRow';
-import ChevronIcon from '@/features/review/icons/ChevronIcon';
+import * as RVI from '@/features/review/icons';
 import InvalidReviewBanner from '@/shared/components/InvalidReviewBanner';
 import type { Review } from '@/shared/types/review';
 
@@ -22,7 +22,7 @@ const ReviewCard = ({
   handleDeleteReview,
 }: ReviewCardProps) => {
   const [isDetail, setIsDetail] = useState(false);
-  const hasEdit = !!review.revision;
+  const hasEdit = !!review.suggest;
   const hasComment = !!review.comment;
   const viewStatus = review.viewStatus ?? 'PENDING';
   const showBanner = viewStatus !== 'PENDING';
@@ -44,7 +44,7 @@ const ReviewCard = ({
             />
           </div>
           <div className='py-0.5'>
-            <ChevronIcon
+            <RVI.ChevronIcon
               isDetail={isDetail}
               handleShowDetail={() => setIsDetail((prev) => !prev)}
             />
@@ -56,11 +56,11 @@ const ReviewCard = ({
             <InvalidReviewBanner
               viewStatus={viewStatus}
               isExpanded={isDetail}
-              originText={review.selectedText}
+              originText={review.originText}
             />
           )}
           <CardContentSection
-            text={review.selectedText}
+            text={review.originText}
             review={review}
             isDetail={isDetail}
           />

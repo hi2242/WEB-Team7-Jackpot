@@ -1,5 +1,4 @@
-import PaperChipIcon from '@/shared/icons/PaperChipIcon';
-import PenToolIcon from '@/shared/icons/PenToolIcon';
+import * as SI from '@/shared/icons';
 import type { Review } from '@/shared/types/review';
 
 const CardContentSection = ({
@@ -21,14 +20,14 @@ const CardContentSection = ({
 
   return (
     <div className='flex w-full flex-col gap-4'>
-      {review.revision && (
+      {review.suggest && (
         <div className='flex w-full flex-col gap-1'>
           <div className='flex items-center gap-1.5'>
-            <PaperChipIcon />
+            <SI.PaperChipIcon />
             <span className='text-body-l font-bold text-gray-950'>첨삭</span>
           </div>
           <p className='text-body-s pl-6 font-normal text-gray-600'>
-            {review.revision}
+            {review.suggest}
           </p>
         </div>
       )}
@@ -36,7 +35,7 @@ const CardContentSection = ({
       {review.comment && (
         <div className='flex w-full flex-col gap-1'>
           <div className='flex items-center gap-1.5'>
-            <PenToolIcon />
+            <SI.PenToolIcon />
             <span className='text-body-l font-bold text-gray-950'>코멘트</span>
           </div>
           <p className='text-body-s pl-6 font-normal text-gray-600'>

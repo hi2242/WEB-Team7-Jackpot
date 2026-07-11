@@ -1,3 +1,5 @@
+import { NOTIFICATION_TYPE } from '@/features/notification/constants';
+
 interface NotificationBaseType {
   id: number;
   title: string;
@@ -6,28 +8,51 @@ interface NotificationBaseType {
   createdAt: string;
 }
 
-interface FeedbackNotificationType extends NotificationBaseType {
-  type: 'FEEDBACK';
+export interface FeedbackNotificationType extends NotificationBaseType {
+  type: typeof NOTIFICATION_TYPE.FEEDBACK;
   meta: {
     sender: {
       id: string;
       nickname: string;
     };
+    coverLetterId: number;
+    qnAId: number;
   };
 }
 
-interface CoverLetterType {
-  coverLetterId: number;
-  questionIds: number[];
-}
-
-interface LabelingNotificationType extends NotificationBaseType {
-  type: 'LABELING_COMPLETE';
+export interface LabelingNotificationType extends NotificationBaseType {
+  type: typeof NOTIFICATION_TYPE.LABELING_COMPLETE;
   meta: {
-    coverLetters: CoverLetterType[];
+    jobId: string;
+    successFileCount: number;
+    failFileCount: number;
   };
 }
 
 export type NotificationType =
   | FeedbackNotificationType
   | LabelingNotificationType;
+
+export interface NotificationResponse {
+  notifications: NotificationType[];
+  hasNext: boolean;
+}
+
+export interface NotificationCountResponse {
+  unreadNotificationCount: number;
+}
+
+export interface QnAType {
+  question: string;
+  answer: string;
+  questionCategory?: string;
+  answerSize: number;
+}
+
+export interface CoverLetterType {
+  qnAs: QnAType[];
+}
+
+export interface LabeledQnAListResponse {
+  coverLetters: CoverLetterType[];
+}

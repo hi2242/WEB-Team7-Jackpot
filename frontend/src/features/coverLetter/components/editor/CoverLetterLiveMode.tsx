@@ -1,11 +1,16 @@
 import CoverLetterEditor from '@/features/coverLetter/components/editor/CoverLetterEditor';
 import CoverLetterToolbar from '@/features/coverLetter/components/editor/CoverLetterToolbar';
 import useCoverLetterActions from '@/features/coverLetter/hooks/useCoverLetterActions';
+import ConfirmModal from '@/shared/components/modal/ConfirmModal';
 import useCoverLetterPagination from '@/shared/hooks/useCoverLetterPagination';
 import { useReviewsByQnaId } from '@/shared/hooks/useReviewQueries';
 import useReviewState from '@/shared/hooks/useReviewState';
 import { useShareQnA } from '@/shared/hooks/useShareQueries';
+import { useSocketMessage } from '@/shared/hooks/websocket/useSocketMessage';
+import { useSocketSubscribe } from '@/shared/hooks/websocket/useSocketSubscribe';
+import { useStompClient } from '@/shared/hooks/websocket/useStompClient';
 import type { CoverLetterType } from '@/shared/types/coverLetter';
+import { isWebSocketResponse } from '@/shared/types/websocket';
 
 interface CoverLetterLiveModeProps {
   shareId: string;
@@ -27,33 +32,55 @@ const CoverLetterLiveMode = ({
   );
   const currentQnAId = qnaIds.length > 0 ? qnaIds[safePageIndex] : undefined;
 
+  const { isConnected, sendMessage, clientRef } = useStompClient({
+    shareId: shareId,
+  });
   const { data: currentQna, isLoading: isQnALoading } = useShareQnA(
     shareId,
     currentQnAId,
+    isConnected,
   );
 
-  const { data: reviewData } = useReviewsByQnaId(currentQnAId);
+  const { data: reviewData } = useReviewsByQnaId(currentQnAId, {
+    enabled: isConnected,
+  });
 
   const reviewState = useReviewState({
     qna: currentQna,
     apiReviews: reviewData?.reviews,
   });
 
-  const { handleDelete, handleCopyLink, handleToggleReview } =
-    useCoverLetterActions({
-      coverLetterId: coverLetter.coverLetterId,
-      currentQna,
-      editedAnswers: reviewState.editedAnswers,
-      currentReviews: reviewState.currentReviews,
-      isReviewActive: isReviewActive,
-      setIsReviewActive: setIsReviewActive,
-    });
+  const { handleMessage } = useSocketMessage({
+    dispatchers: reviewState.dispatchers,
+  });
 
-  // TODO: WebSocket 구독 관리
-  // - 마운트 시: /sub/share/{shareId}/qna/{currentQnAId}/review 구독
-  // - currentQnAId 변경 시: 기존 구독 해제 → 새 구독
-  // - 텍스트 변경 시: /pub/share/{shareId}/qna/{currentQnAId}/text-update 발송
-  // - 언마운트 시: 구독 해제
+  useSocketSubscribe({
+    isConnected,
+    shareId: shareId,
+    qnaId: currentQnAId?.toString(),
+    onMessage: (message: unknown) => {
+      if (!isWebSocketResponse(message)) return;
+      handleMessage(message);
+    },
+    clientRef,
+  });
+
+  const {
+    handleDelete,
+    handleCopyLink,
+    handleToggleReview,
+    deletingId,
+    isDeleting,
+    closeDeleteModal,
+    confirmDelete,
+  } = useCoverLetterActions({
+    coverLetterId: coverLetter.coverLetterId,
+    currentQna,
+    editedAnswers: reviewState.editedAnswers,
+    currentReviews: reviewState.currentReviews,
+    isReviewActive: isReviewActive,
+    setIsReviewActive: setIsReviewActive,
+  });
 
   if (qnaIds.length === 0) {
     return (
@@ -84,19 +111,40 @@ const CoverLetterLiveMode = ({
   );
 
   return (
-    <CoverLetterEditor
-      key={safePageIndex}
-      coverLetter={coverLetter}
-      currentQna={currentQna}
-      currentText={reviewState.currentText}
-      currentReviews={reviewState.currentReviews}
-      currentPageIndex={safePageIndex}
-      totalPages={qnaIds.length}
-      isReviewActive={isReviewActive}
-      toolbar={toolbar}
-      onPageChange={setCurrentPageIndex}
-      onTextChange={reviewState.handleTextChange}
-    />
+    <>
+      <CoverLetterEditor
+        coverLetter={coverLetter}
+        currentQna={currentQna}
+        currentText={reviewState.currentText}
+        currentReviews={reviewState.currentReviews}
+        currentPageIndex={safePageIndex}
+        totalPages={qnaIds.length}
+        isReviewActive={isReviewActive}
+        toolbar={toolbar}
+        onPageChange={setCurrentPageIndex}
+        onTextChange={reviewState.handleTextChange}
+        onReserveNextVersion={reviewState.reserveNextVersion}
+        currentVersion={reviewState.currentVersion}
+        currentReplaceAllSignal={reviewState.currentReplaceAllSignal}
+        isConnected={isConnected}
+        sendMessage={sendMessage}
+        shareId={shareId}
+      />
+
+      <ConfirmModal
+        isOpen={deletingId !== null}
+        isPending={isDeleting}
+        type='warning'
+        title='자기소개서를 삭제하시겠습니까?'
+        description={
+          '삭제된 자기소개서는 복구할 수 없습니다.\n정말로 삭제하시겠습니까?'
+        }
+        confirmText='삭제하기'
+        cancelText='취소'
+        onConfirm={confirmDelete}
+        onCancel={closeDeleteModal}
+      />
+    </>
   );
 };
 

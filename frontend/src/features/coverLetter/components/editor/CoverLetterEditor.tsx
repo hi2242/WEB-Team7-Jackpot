@@ -19,13 +19,13 @@ import {
   useDeleteReview,
 } from '@/shared/hooks/useReviewQueries';
 import type { CoverLetterType } from '@/shared/types/coverLetter';
-import type { MinimalQnA } from '@/shared/types/qna';
+import type { ExtraShareQnA, MinimalQnA } from '@/shared/types/qna';
 import type { Review } from '@/shared/types/review';
 import type { SelectionInfo } from '@/shared/types/selectionInfo';
 
 interface CoverLetterEditorProps {
   coverLetter: CoverLetterType;
-  currentQna: MinimalQnA | undefined;
+  currentQna: ExtraShareQnA | MinimalQnA | undefined;
   currentText: string;
   currentReviews: Review[];
   currentPageIndex: number;
@@ -33,7 +33,17 @@ interface CoverLetterEditorProps {
   isReviewActive: boolean;
   toolbar: ReactNode;
   onPageChange: (index: number) => void;
-  onTextChange: (newText: string) => void;
+  onTextChange: (
+    newText: string,
+    options?: { skipVersionIncrement?: boolean },
+  ) => void;
+  onReserveNextVersion?: () => number;
+  currentVersion: number;
+  currentReplaceAllSignal: number;
+  isSaving?: boolean;
+  isConnected?: boolean;
+  sendMessage?: (destination: string, body: unknown) => void;
+  shareId?: string;
 }
 
 const CoverLetterEditor = ({
@@ -47,32 +57,67 @@ const CoverLetterEditor = ({
   toolbar,
   onPageChange,
   onTextChange,
+  onReserveNextVersion,
+  currentVersion,
+  currentReplaceAllSignal,
+  isSaving = false,
+  isConnected = false,
+  sendMessage = () => {},
+  shareId = '',
 }: CoverLetterEditorProps) => {
   const [, setSearchParams] = useSearchParams();
-  const [selectedReviewId, setSelectedReviewId] = useState<number | null>(null);
-  const [selection, setSelection] = useState<SelectionInfo | null>(null);
-  const [composingLength, setComposingLength] = useState<number | null>(null);
+  const currentQnaId = currentQna?.qnAId ?? null;
+  const [selectedReviewState, setSelectedReviewState] = useState<{
+    qnaId: number | null;
+    reviewId: number | null;
+  }>({
+    qnaId: null,
+    reviewId: null,
+  });
+  const [selectionState, setSelectionState] = useState<{
+    qnaId: number | null;
+    selection: SelectionInfo | null;
+  }>({
+    qnaId: null,
+    selection: null,
+  });
+
+  const [lastTextUpdateAt, setLastTextUpdateAt] = useState<string | undefined>(
+    undefined,
+  );
+  const [composingCharCount, setComposingCharCount] = useState<number | null>(
+    null,
+  );
+  const selectedReviewId =
+    selectedReviewState.qnaId === currentQnaId
+      ? selectedReviewState.reviewId
+      : null;
+  const selection =
+    selectionState.qnaId === currentQnaId ? selectionState.selection : null;
 
   const { mutate: deleteReviewApi } = useDeleteReview(currentQna?.qnAId);
   const { mutate: updateReviewMutation } = useApproveReview(currentQna?.qnAId);
   const { showToast } = useToastMessageContext();
 
   const clearUIState = useCallback(() => {
-    setSelectedReviewId(null);
-    setSelection(null);
-  }, []);
+    setSelectedReviewState({ qnaId: currentQnaId, reviewId: null });
+    setSelectionState({ qnaId: currentQnaId, selection: null });
+    setLastTextUpdateAt(undefined);
+  }, [currentQnaId]);
 
   const onDeleteReview = useCallback(
     (reviewId: number) => {
-      if (!currentQna?.qnAId) return;
+      if (!currentQnaId) return;
       deleteReviewApi(reviewId, {
-        onSuccess: clearUIState,
+        onSuccess: () => {
+          clearUIState();
+        },
         onError: () => {
           showToast('리뷰 삭제에 실패했습니다.');
         },
       });
     },
-    [currentQna?.qnAId, deleteReviewApi, clearUIState, showToast],
+    [currentQnaId, deleteReviewApi, clearUIState, showToast],
   );
 
   const onToggleApproval = useCallback(
@@ -88,6 +133,27 @@ const CoverLetterEditor = ({
     [currentQna?.qnAId, updateReviewMutation, clearUIState, showToast],
   );
 
+  const handleDeleteReviewsByText = useCallback(
+    (reviewIds: number[]) => {
+      Promise.allSettled(
+        reviewIds.map(
+          (reviewId) =>
+            new Promise<void>((resolve, reject) => {
+              deleteReviewApi(reviewId, {
+                onSuccess: () => resolve(),
+                onError: () => reject(),
+              });
+            }),
+        ),
+      ).then((results) => {
+        const failed = results.filter((r) => r.status === 'rejected').length;
+        if (failed > 0) showToast(`리뷰 ${failed}개 삭제에 실패했습니다.`);
+      });
+    },
+    [deleteReviewApi, showToast],
+  );
+
+  // 에디터 내부(useTextSelection): composition 중 안정적인 범위 유지 → IME 보호
   const editingReview = useMemo(
     () =>
       selectedReviewId !== null
@@ -96,15 +162,46 @@ const CoverLetterEditor = ({
     [selectedReviewId, currentReviews],
   );
 
-  const handleReviewClick = useCallback((reviewId: number | null) => {
-    setSelectedReviewId(reviewId);
-  }, []);
+  const handleReviewClick = useCallback(
+    (reviewId: number | null) => {
+      setSelectedReviewState({ qnaId: currentQnaId, reviewId });
+    },
+    [currentQnaId],
+  );
 
   const handleDismiss = useCallback(() => {
-    setSelection(null);
-    setSelectedReviewId(null);
-  }, []);
+    setSelectionState({ qnaId: currentQnaId, selection: null });
+    setSelectedReviewState({ qnaId: currentQnaId, reviewId: null });
+  }, [currentQnaId]);
 
+  const handleSelectionChange = useCallback(
+    (nextSelection: SelectionInfo | null) => {
+      setSelectionState({ qnaId: currentQnaId, selection: nextSelection });
+    },
+    [currentQnaId],
+  );
+
+  // URL의 qnAId가 이미 유효하면 업데이트하지 않음
+  // 유효하지 않은 경우만 현재 qnAId로 업데이트
+  useEffect(() => {
+    const qnAId = currentQna?.qnAId;
+    if (!qnAId) return;
+    const currentQnAIdParam = new URLSearchParams(window.location.search).get(
+      'qnAId',
+    );
+    // URL에 있는 qnAId가 현재 qnAId와 이미 일치하면 업데이트하지 않음
+    if (currentQnAIdParam === String(qnAId)) return;
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        next.set('qnAId', String(qnAId));
+        return next;
+      },
+      { replace: true },
+    );
+  }, [currentQna?.qnAId, setSearchParams]);
+
+  /* 이전 버전 - URL의 qnAId를 항상 덮어쓰는 로직 (제거됨)
   useEffect(() => {
     const qnAId = currentQna?.qnAId;
     if (!qnAId) return;
@@ -118,6 +215,7 @@ const CoverLetterEditor = ({
       { replace: true },
     );
   }, [currentQna?.qnAId, setSearchParams]);
+  */
 
   if (!currentQna) return null;
 
@@ -131,6 +229,8 @@ const CoverLetterEditor = ({
             coverLetter={coverLetter}
             totalPages={totalPages}
             modifiedAt={currentQna.modifiedAt}
+            isSaving={isSaving}
+            textUpdatedAt={lastTextUpdateAt}
           />
 
           <div className='flex min-h-0 flex-1 flex-col gap-3.5 overflow-hidden'>
@@ -152,15 +252,24 @@ const CoverLetterEditor = ({
               selection={selection}
               isReviewActive={isReviewActive}
               selectedReviewId={selectedReviewId}
-              onSelectionChange={setSelection}
+              onSelectionChange={handleSelectionChange}
               onReviewClick={handleReviewClick}
               onTextChange={onTextChange}
-              onComposingLengthChange={setComposingLength}
+              onReserveNextVersion={onReserveNextVersion}
+              isConnected={isConnected}
+              sendMessage={sendMessage}
+              shareId={shareId}
+              qnAId={currentQna.qnAId.toString()}
+              currentVersion={currentVersion}
+              replaceAllSignal={currentReplaceAllSignal}
+              onTextUpdateSent={setLastTextUpdateAt}
+              onDeleteReviewsByText={handleDeleteReviewsByText}
+              onComposingLengthChange={setComposingCharCount}
             />
           </div>
 
           <CoverLetterFooter
-            charCount={composingLength ?? currentText.length}
+            charCount={composingCharCount ?? currentText.length}
             currentPageIndex={currentPageIndex}
             totalPages={totalPages}
             onPageChange={onPageChange}
@@ -177,7 +286,7 @@ const CoverLetterEditor = ({
       </div>
 
       {isReviewActive && (
-        <aside className='h-full min-h-0 w-[248px] overflow-y-auto border-l border-gray-100'>
+        <aside className='flex h-full min-h-0 w-[248px] flex-col overflow-hidden border-l border-gray-100'>
           <ReviewCardList
             reviews={currentReviews}
             selectedReviewId={selectedReviewId}

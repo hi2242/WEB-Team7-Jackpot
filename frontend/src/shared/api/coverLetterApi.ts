@@ -1,13 +1,34 @@
 import { z } from 'zod';
 
-import type { UpdateCoverLetter } from '@/features/recruit/types';
 import { apiClient } from '@/shared/api/apiClient';
+import type { GetScrapsResponse } from '@/shared/types/coverLetter';
 import type {
   CoverLetterType,
   CreateCoverLetterRequest,
   CreateCoverLetterResponse,
+  FilterRequest,
+  FilterResponse,
   RecentCoverLetterType,
+  UpdateCoverLetter,
 } from '@/shared/types/coverLetter';
+
+const ApiApplyHalfSchema = z.enum(['FIRST_HALF', 'SECOND_HALF']);
+
+const CoverLetterItemSchema = z.object({
+  coverLetterId: z.number(),
+  companyName: z.string(),
+  jobPosition: z.string(),
+  applyYear: z.number().optional(),
+  applyHalf: ApiApplyHalfSchema.optional(),
+  deadline: z.string().optional(),
+  questionCount: z.number(),
+});
+
+const FilterResponseSchema = z.object({
+  totalCount: z.number(),
+  coverLetters: z.array(CoverLetterItemSchema),
+  hasNext: z.boolean(),
+});
 
 interface SearchCoverLettersParams {
   searchWord?: string;
@@ -18,11 +39,11 @@ interface SearchCoverLettersParams {
 interface PageInfo {
   number: number;
   size: number;
-  totalElements: number;
-  totalPages: number;
+  totalElement: number;
+  totalPage: number;
 }
 
-interface CoverLetterSearchResponse {
+export interface CoverLetterSearchResponse {
   coverLetters: RecentCoverLetterType[];
   page: PageInfo;
 }
@@ -83,5 +104,81 @@ export const deleteCoverLetter = async (
 ): Promise<void> => {
   await apiClient.delete({
     endpoint: `/coverletter/${coverLetterId}`,
+  });
+};
+
+export const fetchFilterCoverLetter = async (
+  params: FilterRequest,
+  lastIdParam?: number,
+): Promise<FilterResponse> => {
+  const queryParams = new URLSearchParams({
+    startDate: params.startDate,
+    endDate: params.endDate,
+    size: String(params.size ?? 7),
+  });
+
+  // params.isShared가 명시적으로 존재할 때만 파라미터에 추가
+  if (params.isShared !== undefined) {
+    queryParams.append('isShared', String(params.isShared));
+  }
+  if (lastIdParam !== undefined) {
+    queryParams.append('lastCoverLetterId', String(lastIdParam));
+  }
+
+  const response = await apiClient.get({
+    endpoint: `/coverletter/all?${queryParams.toString()}`,
+  });
+
+  return FilterResponseSchema.parse(response);
+};
+
+interface GetScrapsParams {
+  searchWord?: string;
+  size?: number;
+  lastQnaId?: number;
+}
+
+// lastQnaId: 백엔드 API 명세에 따라 'Qna' 대문자 표기 유지
+export const fetchScraps = async ({
+  searchWord,
+  size,
+  lastQnaId,
+}: GetScrapsParams = {}): Promise<GetScrapsResponse> => {
+  const params = new URLSearchParams();
+
+  if (searchWord) params.set('searchWord', searchWord);
+  if (size !== undefined) params.set('size', String(size));
+  if (lastQnaId !== undefined) params.set('lastQnaId', String(lastQnaId));
+
+  return apiClient.get<GetScrapsResponse>({
+    endpoint: `/search/scrap?${params.toString()}`,
+  });
+};
+
+export interface SharedLinkResponse {
+  active: boolean;
+  shareLinkId: string;
+}
+
+export const fetchSharedLink = async ({
+  coverLetterId,
+}: {
+  coverLetterId: number;
+}): Promise<SharedLinkResponse> => {
+  return apiClient.get<SharedLinkResponse>({
+    endpoint: `/coverletter/${coverLetterId}/share-link`,
+  });
+};
+
+export const toggleSharedLinkStatus = async ({
+  coverLetterId,
+  active,
+}: {
+  coverLetterId: number;
+  active: boolean;
+}): Promise<SharedLinkResponse> => {
+  return apiClient.patch<SharedLinkResponse>({
+    endpoint: `/coverletter/${coverLetterId}/share-link`,
+    body: { active },
   });
 };

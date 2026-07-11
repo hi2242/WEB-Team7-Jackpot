@@ -5,13 +5,13 @@ set -e
 # Configuration
 BLUE_PORT=8080
 GREEN_PORT=8081
-DOCKER_IMAGE="${DOCKER_IMAGE_URL:-}" # Docker Hub 이미지 이름
+DOCKER_IMAGE="${DOCKER_IMAGE_NAME:-}" # Docker Hub 이미지 이름
 BASE_CONTAINER_NAME="narratix-app"
 
 echo "Starting deployment..."
 
 if [ -z "${DOCKER_IMAGE}" ]; then
-    echo "ERROR: DOCKER_IMAGE_URL environment variable is not set."
+    echo "ERROR: DOCKER_IMAGE_NAME environment variable is not set."
     exit 1
 fi
 
@@ -46,7 +46,7 @@ sudo docker rm "${TARGET_CONTAINER_NAME}" 2>/dev/null || true
 
 sudo docker run -d \
     --name "${TARGET_CONTAINER_NAME}" \
-    --restart always \
+    --restart on-failure:2 \
     -p "${TARGET_PORT}:8080" \
     -e SPRING_PROFILES_ACTIVE=prod \
     "${DOCKER_IMAGE}"
@@ -54,11 +54,18 @@ sudo docker run -d \
 # 4. Health Check
 echo "Waiting for health check on http://localhost:${TARGET_PORT}/api/v1/health ..."
 RETRY_COUNT=0
-MAX_RETRIES=15 # 5초 * 15 = 75초
+MAX_RETRIES=10 # 5초 * 10 = 50초
 SLEEP_TIME=5
 HEALTH_SUCCESS=false
 
 while [ ${RETRY_COUNT} -lt ${MAX_RETRIES} ]; do
+    # 컨테이너가 종료된 경우 즉시 실패 처리 (재시작 2회 소진 후 빠른 감지)
+    CONTAINER_STATUS=$(sudo docker inspect --format='{{.State.Status}}' "${TARGET_CONTAINER_NAME}" 2>/dev/null || echo "not_found")
+    if [ "${CONTAINER_STATUS}" = "exited" ] || [ "${CONTAINER_STATUS}" = "not_found" ]; then
+        echo "Container exited unexpectedly after retries. Aborting health check."
+        break
+    fi
+
     if curl -sf "http://localhost:${TARGET_PORT}/api/v1/health" > /dev/null 2>&1; then
         echo "Health check passed!"
         HEALTH_SUCCESS=true
@@ -71,11 +78,29 @@ while [ ${RETRY_COUNT} -lt ${MAX_RETRIES} ]; do
 done
 
 if [ "${HEALTH_SUCCESS}" != true ]; then
-    echo "ERROR: Health check failed"
+    echo "=========================================="
+    echo "❌ ERROR: Health check failed after ${MAX_RETRIES} attempts"
+    echo "=========================================="
+    echo ""
+    echo "📋 Container logs (last 100 lines):"
+    echo "------------------------------------------"
+    sudo docker logs --tail 100 "${TARGET_CONTAINER_NAME}" 2>&1
+    echo "------------------------------------------"
+    echo ""
+    echo "🧹 Cleaning up failed container..."
     sudo docker stop "${TARGET_CONTAINER_NAME}" || true
     sudo docker rm "${TARGET_CONTAINER_NAME}" || true
+    echo ""
+    echo "Cleaning up unused images..."
+    sudo docker image prune -f
+    echo "========== Deployment FAILED =========="
     exit 1
 fi
+
+# 헬스체크 통과 후 재시작 정책을 always로 전환
+# 운영 중 크래시 시 자동 재시작 보장
+echo "Applying restart policy to ${TARGET_CONTAINER_NAME}..."
+sudo docker update --restart=always "${TARGET_CONTAINER_NAME}"
 
 CONF_FILE="/etc/nginx/conf.d/site-url.inc"
 
@@ -88,7 +113,7 @@ if sudo nginx -t; then
     sudo nginx -s reload
     echo "Nginx reloaded."
 else
-    echo "Nginx config test failed!"
+    echo "Nginx config test failed! Rolling back..."
     echo "set \$service_url http://127.0.0.1:${IDLE_PORT};" | sudo tee ${CONF_FILE}
     exit 1
 fi

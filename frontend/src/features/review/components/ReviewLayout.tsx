@@ -1,7 +1,8 @@
-import { useParams } from 'react-router';
+import { useNavigate, useParams } from 'react-router';
 
 import CoverLetterSection from '@/features/review/components/coverLetter/CoverLetterSection';
 import ReviewListSection from '@/features/review/components/review/ReviewListSection';
+import LoadingModal from '@/shared/components/modal/LoadingModal';
 import useCoverLetterPagination from '@/shared/hooks/useCoverLetterPagination';
 import { useReviewsByQnaId } from '@/shared/hooks/useReviewQueries';
 import useReviewState from '@/shared/hooks/useReviewState';
@@ -9,45 +10,81 @@ import {
   useShareCoverLetter,
   useShareQnA,
 } from '@/shared/hooks/useShareQueries';
+import { useSocketMessage } from '@/shared/hooks/websocket/useSocketMessage';
+import { useSocketSubscribe } from '@/shared/hooks/websocket/useSocketSubscribe';
+import { useStompClient } from '@/shared/hooks/websocket/useStompClient';
+import type { RecentCoverLetterType } from '@/shared/types/coverLetter';
+import {
+  isShareDeactivatedMessage,
+  isWebSocketResponse,
+} from '@/shared/types/websocket';
 
 const ReviewLayout = () => {
   const { sharedId } = useParams();
+  const navigate = useNavigate();
 
   if (!sharedId) {
     throw new Error('유효하지 않은 공유 링크입니다.');
   }
 
-  // 1. ShareId로 CoverLetter 정보 + QnA ID 목록 조회 (Suspense)
-  const { data: shareData } = useShareCoverLetter(sharedId);
-  const { coverLetter, qnAIds } = shareData;
+  const { isConnected, clientRef } = useStompClient({
+    shareId: sharedId,
+  });
 
-  // 2. 현재 페이지 인덱스 → 해당 QnA ID 결정
+  const { data: shareData, isLoading: isShareDataLoading } =
+    useShareCoverLetter(sharedId, isConnected);
+
+  const qnAIds = shareData?.qnAIds || [];
+  const coverLetter: RecentCoverLetterType | null =
+    shareData?.coverLetter ?? null;
+
   const { safePageIndex, setCurrentPageIndex } = useCoverLetterPagination(
     qnAIds.length,
   );
+
   const currentQnAId = qnAIds.length > 0 ? qnAIds[safePageIndex] : undefined;
 
-  // 3. 현재 QnA만 단건 조회
   const { data: currentQna, isLoading: isQnALoading } = useShareQnA(
     sharedId,
     currentQnAId,
+    isConnected,
   );
-
   const { data: reviewData } = useReviewsByQnaId(currentQnAId);
 
-  const {
-    currentText,
-    currentReviews,
-    editingReview,
-    selection,
-    setSelection,
-    handleUpdateReview,
-    handleEditReview,
-    handleCancelEdit,
-  } = useReviewState({
+  const reviewState = useReviewState({
     qna: currentQna,
     apiReviews: reviewData?.reviews,
   });
+
+  const { handleMessage } = useSocketMessage({
+    dispatchers: reviewState.dispatchers,
+  });
+
+  useSocketSubscribe({
+    isConnected,
+    shareId: sharedId,
+    qnaId: currentQnAId?.toString(),
+    clientRef,
+    onMessage: (message: unknown) => {
+      if (isShareDeactivatedMessage(message)) {
+        alert('작성자가 첨삭 url을 비활성화시켰어요!');
+        navigate('/home');
+        return;
+      }
+      if (!isWebSocketResponse(message)) return;
+      handleMessage(message);
+    },
+  });
+
+  if (!isConnected) {
+    return <LoadingModal isLoading={true} message='웹소켓 연결 중입니다.' />;
+  }
+
+  if (isShareDataLoading || !shareData) {
+    return (
+      <LoadingModal isLoading={true} message='데이터 불러오는 중입니다.' />
+    );
+  }
 
   if (qnAIds.length === 0) {
     return (
@@ -60,39 +97,46 @@ const ReviewLayout = () => {
   // !currentQna: 실제로는 위 qnAIds.length === 0 가드에서 걸리지만, TypeScript 타입 좁힘을 위해 필요
   if (isQnALoading || !currentQna) {
     return (
-      <div className='flex flex-1 items-center justify-center'>
-        <span className='text-gray-400'>질문을 불러오는 중...</span>
+      <LoadingModal isLoading={true} message='데이터 불러오는 중입니다.' />
+    );
+  }
+
+  if (!coverLetter) {
+    return (
+      <div className='p-8 text-center text-gray-500'>
+        커버레터 정보를 불러올 수 없습니다.
       </div>
     );
   }
 
   return (
     <div className='flex min-h-0 flex-1 flex-row pb-30'>
-      <main className='w-full'>
+      <main className='h-full min-w-0 flex-1'>
         <CoverLetterSection
           company={coverLetter.companyName}
           job={coverLetter.jobPosition}
           questionIndex={safePageIndex + 1}
           question={currentQna.question}
-          text={currentText}
-          reviews={currentReviews}
+          text={reviewState.currentText}
+          reviews={reviewState.currentReviews}
           currentPage={safePageIndex}
           totalPages={qnAIds.length}
-          editingReview={editingReview}
-          selection={selection}
-          onSelectionChange={setSelection}
+          editingReview={reviewState.editingReview}
+          selection={reviewState.selection}
+          onSelectionChange={reviewState.setSelection}
           qnaId={currentQna.qnAId}
-          onUpdateReview={handleUpdateReview}
-          onCancelEdit={handleCancelEdit}
+          onUpdateReview={reviewState.handleUpdateReview}
+          onCancelEdit={reviewState.handleCancelEdit}
           onPageChange={setCurrentPageIndex}
+          currentVersion={reviewState.currentVersion}
         />
       </main>
-      <aside className='h-full w-[426px] flex-none'>
+      <aside className='h-full min-h-0 w-[426px] flex-none overflow-hidden'>
         <ReviewListSection
-          reviews={currentReviews}
-          editingReview={editingReview}
+          reviews={reviewState.currentReviews}
+          editingReview={reviewState.editingReview}
           qnaId={currentQna.qnAId}
-          onEditReview={handleEditReview}
+          onEditReview={reviewState.handleEditReview}
         />
       </aside>
     </div>

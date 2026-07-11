@@ -1,18 +1,36 @@
 import { useRef } from 'react';
 
-import SidebarCard from '@/features/coverLetter/components/sidebar/SidebarCard';
-import { useScrapCoverLetters } from '@/features/coverLetter/hooks/useCoverLetterQueries';
-import type { ScrapItem } from '@/features/coverLetter/types/coverLetter';
+import SidebarCard from '@/shared/components/sidebar/SidebarCard';
 import { SidebarSkeleton } from '@/shared/components/SidebarSkeleton';
+import { useToastMessageContext } from '@/shared/hooks/toastMessage/useToastMessageContext';
+import { useScrapCoverLetters } from '@/shared/hooks/useCoverLetterQueries';
 import useInfiniteScroll from '@/shared/hooks/useInfiniteScroll';
+import { useDeleteScrapMutation } from '@/shared/hooks/useScrapQueries';
+import type { ScrapItem } from '@/shared/types/coverLetter';
 
 interface ScrapListProps {
   searchWord: string;
-  deleteScrap: (id: number) => void;
   onSelect: (item: ScrapItem) => void;
 }
 
-const ScrapList = ({ searchWord, deleteScrap, onSelect }: ScrapListProps) => {
+const ScrapList = ({ searchWord, onSelect }: ScrapListProps) => {
+  const { showToast } = useToastMessageContext();
+
+  // 삭제 API 훅 가져오기
+  const { mutate: deleteScrapMutation } = useDeleteScrapMutation();
+
+  // 스크랩 삭제 함수 구현
+  const deleteScrap = (id: number) => {
+    deleteScrapMutation(id, {
+      onSuccess: () => {
+        showToast('스크랩이 삭제되었습니다.', true);
+      },
+      onError: () => {
+        showToast('처리에 실패했습니다. 다시 시도해주세요.', false);
+      },
+    });
+  };
+
   const sentinelRef = useRef<HTMLDivElement>(null);
   const { data, fetchNextPage, hasNextPage, isFetchingNextPage } =
     useScrapCoverLetters(searchWord);
@@ -38,7 +56,7 @@ const ScrapList = ({ searchWord, deleteScrap, onSelect }: ScrapListProps) => {
     <>
       {items.map((item) => (
         <SidebarCard
-          key={`scrap-${item.questionId}`}
+          key={`scrap-${item.id}`}
           item={item}
           isScrap={true}
           deleteScrap={deleteScrap}

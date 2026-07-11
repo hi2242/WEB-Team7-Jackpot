@@ -4,22 +4,29 @@ import {
   useQuery,
 } from '@tanstack/react-query';
 
-import { fetchCalendarDates, fetchQnAList } from '@/features/recruit/api';
-import type { CalendarRequest } from '@/features/recruit/types';
-import { getCoverLetter } from '@/shared/api/coverLetterApi';
+import { fetchQnAList } from '@/features/recruit/api';
+import {
+  fetchFilterCoverLetter,
+  getCoverLetter,
+} from '@/shared/api/coverLetterApi';
 import { getQnAIdList } from '@/shared/api/qnaApi';
-import { coverLetterQueryKeys } from '@/shared/hooks/queries/coverLetterQueryKeys';
-import type { ApiApplyHalf, Category } from '@/shared/types/coverLetter';
+import { CATEGORY_VALUES } from '@/shared/constants/createCoverLetter';
+import { coverLetterQueryKeys } from '@/shared/hooks/queries/coverLetterKeys';
+import type {
+  ApiApplyHalf,
+  Category,
+  FilterRequest,
+} from '@/shared/types/coverLetter';
 
 // 1. 달력 조회
-export const useInfiniteCalendarDates = (params: CalendarRequest) => {
+export const useInfiniteCalendarDates = (params: FilterRequest) => {
   return useInfiniteQuery({
     queryKey: coverLetterQueryKeys.calendar(params),
 
     // 초기 커서 값
     initialPageParam: undefined as number | undefined,
 
-    queryFn: ({ pageParam }) => fetchCalendarDates(params, pageParam),
+    queryFn: ({ pageParam }) => fetchFilterCoverLetter(params, pageParam),
 
     getNextPageParam: (lastPage) => {
       if (!lastPage.hasNext) {
@@ -45,13 +52,13 @@ export interface RecruitFormViewModel {
   applyHalf?: ApiApplyHalf;
   deadline?: string;
   questions: {
-    qnAId: number;
+    qnAId: number | null; // 신규 질문은 qnAId가 없으므로 null 허용
     question: string;
     category: Category;
   }[];
 }
 
-// 2. 통합 데이터 패칭 훅
+// 2. 공고 수정을 위한 조회
 export const useUpdateRecruit = (coverLetterId: number) => {
   const isValidId =
     !!coverLetterId && !Number.isNaN(coverLetterId) && coverLetterId > 0;
@@ -69,19 +76,14 @@ export const useUpdateRecruit = (coverLetterId: number) => {
         const qnaRes = await fetchQnAList(qnAIdListRes);
         // [박소민] TODO: 리팩토링
         questions = qnaRes.qnAs
-          .filter(
-            (
-              q,
-            ): q is {
-              qnAId: number;
-              question: string;
-              category: Category;
-            } => q.qnAId !== undefined && q.category !== '',
-          )
+          .filter((q) => {
+            // ID가 없어도(신규), 질문 내용이나 카테고리가 있으면 유효한 데이터로 간주
+            return q.question !== '' || CATEGORY_VALUES.includes(q.category); // ''는 카테고리 선택 안 한 경우의 초기값이므로 유효하지 않음
+          })
           .map((q) => ({
-            qnAId: q.qnAId,
-            question: q.question,
-            category: q.category,
+            qnAId: q.qnAId ?? null, // undefined인 경우 null로 명시적 변환
+            question: q.question ?? '',
+            category: q.category as Category,
           }));
       }
 
@@ -96,6 +98,5 @@ export const useUpdateRecruit = (coverLetterId: number) => {
       };
     },
     enabled: isValidId,
-    staleTime: 5 * 60 * 1000,
   });
 };

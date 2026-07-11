@@ -1,0 +1,56 @@
+package com.jackpot.narratix.domain.service;
+
+import com.jackpot.narratix.domain.controller.request.CreateScrapRequest;
+import com.jackpot.narratix.domain.controller.response.CreateScrapResponse;
+import com.jackpot.narratix.domain.controller.response.ScrapCountResponse;
+import com.jackpot.narratix.domain.entity.QnA;
+import com.jackpot.narratix.domain.entity.Scrap;
+import com.jackpot.narratix.domain.entity.ScrapId;
+import com.jackpot.narratix.domain.exception.ScrapErrorCode;
+import com.jackpot.narratix.domain.repository.QnARepository;
+import com.jackpot.narratix.domain.repository.ScrapRepository;
+import com.jackpot.narratix.global.exception.BaseException;
+import com.jackpot.narratix.global.exception.GlobalErrorCode;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+
+@Service
+@RequiredArgsConstructor
+public class ScrapService {
+
+    private final ScrapRepository scrapRepository;
+    private final QnARepository qnARepository;
+
+    @Transactional
+    public CreateScrapResponse createScrap(String userId, CreateScrapRequest request) {
+        if (isIdDuplicated(userId, request.qnAId())) {
+            throw new BaseException(ScrapErrorCode.DUPLICATE_SCRAP);
+        }
+        Scrap scrap = Scrap.of(userId, request.qnAId());
+        scrapRepository.save(scrap);
+
+        return new CreateScrapResponse(scrap.getId().getQnAId(), scrapRepository.countByUserId(userId));
+    }
+
+    private boolean isIdDuplicated(String userId, Long qnAId) {
+        return scrapRepository.existsById(userId, qnAId);
+    }
+
+    @Transactional(readOnly = true)
+    public ScrapCountResponse getScrapCount(String userId) {
+        return new ScrapCountResponse(scrapRepository.countByUserId(userId));
+    }
+
+    @Transactional
+    public ScrapCountResponse deleteScrapById(String userId, Long qnAId) {
+        QnA qnA = qnARepository.findByIdOrElseThrow(qnAId);
+        if (!qnA.isOwner(userId)) throw new BaseException(GlobalErrorCode.FORBIDDEN);
+
+        ScrapId scrapId = new ScrapId(userId, qnAId);
+        scrapRepository.deleteById(scrapId);
+
+        return new ScrapCountResponse(scrapRepository.countByUserId(userId));
+    }
+}

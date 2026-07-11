@@ -1,11 +1,11 @@
-import { type ChangeEvent, useEffect, useState } from 'react';
+import { type ChangeEvent, useCallback, useEffect, useState } from 'react';
 
 import { useSearchParams } from 'react-router';
 
 import { useToastMessageContext } from '@/shared/hooks/toastMessage/useToastMessageContext';
 import { validateSearchKeyword } from '@/shared/utils/validation';
 
-interface UseSearchProps<T> {
+interface UseSearchProps {
   queryKey?: string;
   fetchAction?: (keyword: string) => Promise<T>;
   isEnabled?: boolean;
@@ -22,8 +22,49 @@ export const useSearch = <T = unknown>({
   const [searchParams, setSearchParams] = useSearchParams();
   const { showToast } = useToastMessageContext();
 
-  // ✅ [중요] 객체 대신 실제 문자열 값을 변수로 추출
+  // 1. 현재 URL 파라미터와 로컬 스토리지 값을 동기적으로 확인
   const currentQueryParam = searchParams.get(queryKey) || '';
+  const savedKeyword =
+    activeCondition && storageKey ? localStorage.getItem(storageKey) || '' : '';
+
+  // 현재 페이지 파라미터 추출
+  const rawPage = Number(searchParams.get(pageKey));
+  const currentPageParam = isPagination
+    ? Number.isInteger(rawPage) && rawPage > 0
+      ? rawPage
+      : 1
+    : undefined;
+
+  // 로컬 스토리지에는 검색어가 있는데, URL에는 아직 없는 상태인가?
+  const isSyncingUrl =
+    activeCondition &&
+    savedKeyword !== '' &&
+    currentQueryParam !== savedKeyword;
+
+  // 2. 검색어 상태 초기화
+  const [keyword, setKeyword] = useState(() => {
+    if (!activeCondition) return '';
+    if (savedKeyword) return savedKeyword;
+    return currentQueryParam;
+  });
+
+  // 3. 탭 전환 감지 및 렌더링 중 상태 덮어쓰기
+  const [prevActiveCondition, setPrevActiveCondition] =
+    useState(activeCondition);
+  const [prevStorageKey, setPrevStorageKey] = useState(storageKey);
+
+  if (
+    activeCondition !== prevActiveCondition ||
+    storageKey !== prevStorageKey
+  ) {
+    setPrevActiveCondition(activeCondition);
+    setPrevStorageKey(storageKey);
+    setKeyword(savedKeyword);
+  }
+
+  const handleChange = useCallback((e: ChangeEvent<HTMLInputElement>) => {
+    setKeyword(e.target.value);
+  }, []);
 
   // 1. 초기값 설정
   // URL에 값이 없고 storageKey가 주어진 경우, 저장된 검색어로 복원
@@ -40,14 +81,53 @@ export const useSearch = <T = unknown>({
     () => isEnabled && !currentQueryParam && keyword !== currentQueryParam,
   );
 
-  const [data, setData] = useState<T | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+    // 즉시 로컬 스토리지에서 삭제하여 무한 로딩(isSyncingUrl = true) 방지
+    if (storageKey) {
+      localStorage.removeItem(storageKey);
+    }
 
-  // 2. URL 동기화 (외부 변경 감지)
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        next.delete(queryKey);
+        if (isPagination) next.delete(pageKey);
+
+        return next;
+      },
+      { replace: true },
+    );
+  }, [queryKey, pageKey, isPagination, setSearchParams, storageKey]);
+
+  const handlePageChange = useCallback(
+    (newPage: number) => {
+      if (!isPagination) return;
+      if (!Number.isInteger(newPage) || newPage < 1) return;
+
+      setSearchParams((prev) => {
+        const next = new URLSearchParams(prev);
+        next.set(pageKey, newPage.toString());
+        return next;
+      });
+    },
+    [isPagination, pageKey, setSearchParams],
+  );
+
+  // 5. 외부 시스템(URL, 스토리지) 동기화 Effect (Calling effect 제거됨)
   useEffect(() => {
-    if (!isEnabled) {
-      setKeyword('');
+    if (!activeCondition) {
+      setSearchParams(
+        (prev) => {
+          const hasQuery = prev.has(queryKey);
+          const hasPage = isPagination && prev.has(pageKey);
+          if (!hasQuery && !hasPage) return prev;
+
+          const next = new URLSearchParams(prev);
+          if (hasQuery) next.delete(queryKey);
+          if (hasPage) next.delete(pageKey);
+          return next;
+        },
+        { replace: true },
+      );
       return;
     }
     // 복원된 초기값이 아직 URL에 반영되기 전이면 덮어쓰지 않음
@@ -103,20 +183,30 @@ export const useSearch = <T = unknown>({
           setSearchParams(nextParams);
           setData(null);
         }
-        return;
       }
 
-      const { isValid, message } = validateSearchKeyword(keyword);
-      if (!isValid) {
-        setErrorMessage(message);
-        return;
+      // 로컬 스토리지 동기화
+      if (storageKey) {
+        if (trimmedKeyword) localStorage.setItem(storageKey, trimmedKeyword);
+        else localStorage.removeItem(storageKey);
       }
 
-      // ✅ 현재 URL 값과 다를 때만 업데이트 (중복 호출 방지)
-      if (currentQueryParam !== keyword) {
-        const nextParams = new URLSearchParams(searchParams);
-        nextParams.set(queryKey, keyword);
-        setSearchParams(nextParams);
+      // URL 동기화
+      if (currentQueryParam !== trimmedKeyword) {
+        setSearchParams(
+          (prev) => {
+            const next = new URLSearchParams(prev);
+            if (trimmedKeyword) {
+              next.set(queryKey, trimmedKeyword);
+              if (isPagination) next.set(pageKey, '1');
+            } else {
+              next.delete(queryKey);
+              if (isPagination) next.delete(pageKey);
+            }
+            return next;
+          },
+          { replace: true },
+        );
       }
     }, 300);
 
@@ -165,5 +255,3 @@ export const useSearch = <T = unknown>({
     isInitializing,
   };
 };
-
-export default useSearch;

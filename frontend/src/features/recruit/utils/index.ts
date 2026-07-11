@@ -1,5 +1,5 @@
 import type { QnAListResponse } from '@/features/recruit/types';
-import { type CoverLetterType } from '@/shared/types/coverLetter';
+import type { CoverLetterType } from '@/shared/types/coverLetter';
 
 // 타입을 먼저 정의합니다 (기존 타입을 재활용하거나 새로 정의)
 interface CombinedCoverLetter {
@@ -25,11 +25,7 @@ export const combineCoverLetterData = (
       deadline: coverLetterData.deadline,
     },
     // qnAs 배열을 questions라는 이름으로 매핑
-    questions: qnaData.qnAs.map((q) => ({
-      qnAId: q.qnAId,
-      question: q.question,
-      category: q.category,
-    })),
+    questions: qnaData.qnAs,
   };
 };
 

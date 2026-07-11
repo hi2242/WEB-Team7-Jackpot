@@ -1,0 +1,12 @@
+# 모든 파일의 줄바꿈을 자동으로 감지하고 커밋할 때는 LF로 변환
+* text=auto
+
+# 특정 확장자나 파일은 무조건 LF로 고정 (맥/리눅스 표준)
+*.js text eol=lf
+*.ts text eol=lf
+*.json text eol=lf
+*.yaml text eol=lf
+
+# 이미지 같은 이진 파일은 건드리지 않도록 설정
+*.png binary
+*.jpg binary

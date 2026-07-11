@@ -9,8 +9,7 @@ export interface Sender {
 }
 
 export interface ReviewBase {
-  selectedText: string;
-  revision: string;
+  originText: string;
   comment: string;
   range: TextRange;
 }
@@ -19,15 +18,24 @@ export type ReviewViewStatus =
   | 'PENDING'
   | 'PENDING_CHANGED'
   | 'ACCEPTED'
-  | 'OUTDATED';
+  | 'OUTDATED'
+  | 'REVERT';
+
+// 활성 리뷰: 화면에 표시되고 새 리뷰 작성을 차단하는 상태
+export const ACTIVE_REVIEW_STATUSES: readonly ReviewViewStatus[] = [
+  'PENDING',
+  'ACCEPTED',
+];
+
+export const isActiveViewStatus = (
+  status: ReviewViewStatus | undefined,
+): boolean => status !== undefined && ACTIVE_REVIEW_STATUSES.includes(status);
 
 export interface Review extends ReviewBase {
   id: number;
   sender?: Sender;
-  originText?: string;
   suggest?: string | null;
   createdAt?: string;
-  isValid?: boolean;
   isApproved?: boolean;
   viewStatus?: ReviewViewStatus;
 }

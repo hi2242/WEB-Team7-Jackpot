@@ -1,4 +1,4 @@
-import EmptyReview from '@/features/review/components/review/EmptyReview';
+import emptyReview from '@/assets/icons/emptyReview.svg';
 import ReviewCard from '@/features/review/components/review/ReviewCard';
 import { useToastMessageContext } from '@/shared/hooks/toastMessage/useToastMessageContext';
 import { useDeleteReview } from '@/shared/hooks/useReviewQueries';
@@ -30,9 +30,9 @@ const ReviewListSection = ({
   };
 
   return (
-    <div className='mx-[13px] flex h-full flex-col items-start gap-0 overflow-x-hidden overflow-y-auto bg-white'>
+    <div className='mx-[13px] flex h-full min-h-0 flex-col bg-white'>
       {reviews.length > 0 ? (
-        <div className='pb-80'>
+        <div className='min-h-0 flex-1 overflow-y-auto pb-80'>
           {reviews.map((review) => (
             <ReviewCard
               key={review.id}
@@ -44,8 +44,8 @@ const ReviewListSection = ({
           ))}
         </div>
       ) : (
-        <div className='flex h-full items-center justify-center'>
-          <EmptyReview />
+        <div className='flex min-h-0 flex-1 items-center justify-center'>
+          <img src={emptyReview} alt='빈 리뷰 아이콘' />
         </div>
       )}
     </div>

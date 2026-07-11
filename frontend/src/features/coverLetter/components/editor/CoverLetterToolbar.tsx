@@ -1,11 +1,9 @@
-import LinkAngled from '@/features/coverLetter/icons/LinkAngled';
-import { ReviewMessageIcon } from '@/features/coverLetter/icons/ReviewMessageIcon';
-import SaveCheckIcon from '@/features/coverLetter/icons/SaveCheckIcon';
-import TrashIcon from '@/features/coverLetter/icons/TrashIcon';
+import * as CI from '@/features/coverLetter/icons';
+import * as SI from '@/shared/icons';
 
 type SaveProps =
   | { autoSave: true; onSave?: never; isPending?: never }
-  | { autoSave?: false; onSave: () => void; isPending?: boolean };
+  | { autoSave?: false; onSave?: () => void; isPending?: boolean };
 
 type CoverLetterToolbarProps = {
   companyName: string;
@@ -27,6 +25,8 @@ const CoverLetterToolbar = ({
   onDelete,
   autoSave,
 }: CoverLetterToolbarProps) => {
+  const isDisabled = isPending || !onSave;
+
   return (
     <div className='flex flex-shrink-0 items-center justify-between'>
       <div className='flex gap-1'>
@@ -46,13 +46,13 @@ const CoverLetterToolbar = ({
         <button
           type='button'
           onClick={onToggleReview}
-          className={`flex cursor-pointer items-center gap-1.5 rounded-xl border px-3 py-1.5 text-sm font-medium transition-colors ${
+          className={`flex cursor-pointer items-center gap-1.5 rounded-xl border px-3 py-1.5 text-sm font-medium transition-colors duration-200 ${
             isReviewActive
-              ? 'border-gray-800 bg-gray-800 text-white'
+              ? 'border-gray-800 bg-gray-900 text-white hover:bg-gray-700'
               : 'border-gray-200 bg-white text-gray-700 hover:bg-gray-50'
           }`}
         >
-          <ReviewMessageIcon className='h-5 w-5' />
+          <SI.ReviewMessageIcon className='h-5 w-5' />
           <span>{isReviewActive ? '첨삭 비활성화' : '첨삭 활성화'}</span>
         </button>
 
@@ -62,12 +62,12 @@ const CoverLetterToolbar = ({
           disabled={!isReviewActive}
           className={`flex items-center gap-1.5 rounded-xl border border-gray-200 bg-white px-3 py-1.5 text-sm font-medium transition-colors ${
             isReviewActive
-              ? 'cursor-pointer text-gray-700 hover:bg-gray-50'
+              ? 'cursor-pointer text-gray-700 hover:bg-gray-100'
               : 'cursor-not-allowed text-gray-400 opacity-50'
           }`}
           aria-label='첨삭 링크 복사'
         >
-          <LinkAngled />
+          <CI.LinkAngled />
           <span>링크 복사</span>
         </button>
 
@@ -80,14 +80,14 @@ const CoverLetterToolbar = ({
           <button
             type='button'
             onClick={onSave}
-            disabled={isPending || !onSave}
-            className={`flex items-center gap-1.5 rounded-xl px-4 py-1.5 text-sm font-bold text-white transition-colors ${
-              isPending || !onSave
+            disabled={isDisabled}
+            className={`flex items-center gap-1.5 rounded-xl px-4 py-1.5 text-sm font-bold text-white transition-colors duration-200 ${
+              isDisabled
                 ? 'cursor-not-allowed bg-gray-400'
-                : 'cursor-pointer bg-gray-800 hover:bg-gray-900'
+                : 'cursor-pointer bg-gray-900 hover:bg-gray-700'
             }`}
           >
-            <SaveCheckIcon />
+            <SI.SaveCheckIcon />
             <span>{isPending ? '저장 중...' : '저장하기'}</span>
           </button>
         )}
@@ -95,9 +95,9 @@ const CoverLetterToolbar = ({
         <button
           type='button'
           onClick={onDelete}
-          className='flex cursor-pointer items-center gap-1.5 rounded-xl border border-gray-200 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 transition-colors hover:border-red-200 hover:bg-red-50 hover:text-red-600'
+          className='flex cursor-pointer items-center gap-1.5 rounded-xl border border-gray-200 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 transition-colors duration-200 hover:border-red-200 hover:bg-red-50 hover:text-red-600'
         >
-          <TrashIcon />
+          <CI.TrashIcon />
           <span>삭제하기</span>
         </button>
       </div>

@@ -1,6 +1,9 @@
+import { useSearchParams } from 'react-router';
+
 import CoverLetterEditor from '@/features/coverLetter/components/editor/CoverLetterEditor';
 import CoverLetterToolbar from '@/features/coverLetter/components/editor/CoverLetterToolbar';
 import useCoverLetterActions from '@/features/coverLetter/hooks/useCoverLetterActions';
+import ConfirmModal from '@/shared/components/modal/ConfirmModal';
 import useCoverLetterPagination from '@/shared/hooks/useCoverLetterPagination';
 import { useQnAList } from '@/shared/hooks/useQnAQueries';
 import { useReviewsByQnaId } from '@/shared/hooks/useReviewQueries';
@@ -21,17 +24,24 @@ const CoverLetterApiMode = ({
   setIsReviewActive,
 }: CoverLetterApiModeProps) => {
   const { data: qnas } = useQnAList(qnaIds);
+  const [searchParams, setSearchParams] = useSearchParams();
 
-  const { safePageIndex, setCurrentPageIndex } = useCoverLetterPagination(
-    qnas.length,
-  );
+  // Hook에서 URL 기반 페이지 인덱스와 페이지 변경 핸들러 가져오기
+  const { safePageIndex, handlePageChange } = useCoverLetterPagination({
+    qnas,
+    searchParams,
+    setSearchParams,
+  });
+
   const currentQna = qnas.length > 0 ? qnas[safePageIndex] : undefined;
 
-  const { data: reviewData } = useReviewsByQnaId(currentQna?.qnAId);
+  const { data: reviewData } = useReviewsByQnaId(currentQna?.qnAId, {
+    enabled: isReviewActive,
+  });
 
   const reviewState = useReviewState({
     qna: currentQna,
-    apiReviews: reviewData?.reviews,
+    apiReviews: isReviewActive ? reviewData?.reviews : undefined,
   });
 
   const {
@@ -40,6 +50,10 @@ const CoverLetterApiMode = ({
     handleCopyLink,
     handleToggleReview,
     isPending,
+    deletingId,
+    isDeleting,
+    closeDeleteModal,
+    confirmDelete,
   } = useCoverLetterActions({
     coverLetterId: coverLetter.coverLetterId,
     currentQna,
@@ -71,19 +85,38 @@ const CoverLetterApiMode = ({
   );
 
   return (
-    <CoverLetterEditor
-      key={safePageIndex}
-      coverLetter={coverLetter}
-      currentQna={currentQna}
-      currentText={reviewState.currentText}
-      currentReviews={reviewState.currentReviews}
-      currentPageIndex={safePageIndex}
-      totalPages={qnas.length}
-      isReviewActive={isReviewActive}
-      toolbar={toolbar}
-      onPageChange={setCurrentPageIndex}
-      onTextChange={reviewState.handleTextChange}
-    />
+    <>
+      <CoverLetterEditor
+        coverLetter={coverLetter}
+        currentQna={currentQna}
+        currentText={reviewState.currentText}
+        currentReviews={reviewState.currentReviews}
+        currentPageIndex={safePageIndex}
+        totalPages={qnas.length}
+        isReviewActive={isReviewActive}
+        toolbar={toolbar}
+        onPageChange={handlePageChange}
+        onTextChange={reviewState.handleTextChange}
+        onReserveNextVersion={reviewState.reserveNextVersion}
+        currentVersion={reviewState.currentVersion}
+        currentReplaceAllSignal={reviewState.currentReplaceAllSignal}
+        isSaving={isPending}
+      />
+
+      <ConfirmModal
+        isOpen={deletingId !== null}
+        isPending={isDeleting}
+        type='warning'
+        title='자기소개서를 삭제하시겠습니까?'
+        description={
+          '삭제된 자기소개서는 복구할 수 없습니다.\n정말로 삭제하시겠습니까?'
+        }
+        confirmText='삭제하기'
+        cancelText='취소'
+        onConfirm={confirmDelete}
+        onCancel={closeDeleteModal}
+      />
+    </>
   );
 };
 

@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react';
 
-import { LandingPageIcon as I } from '@/features/landing/icons';
+import { LANDING_CONTENT } from '@/features/landing/constants';
+import * as LAI from '@/features/landing/icons';
 
 const LandingTypographyAnimation = () => {
   const [isLoaded, setIsLoaded] = useState(false);
 
-  const line1Text = 'Type';
-  const line2Text = 'New Narratix';
+  const line1Text = LANDING_CONTENT.TYPOGRAPHY.LINES.ONE;
+  const line2Text = LANDING_CONTENT.TYPOGRAPHY.LINES.TWO;
 
   const maskStyle = {
     WebkitMaskImage:
@@ -18,7 +19,7 @@ const LandingTypographyAnimation = () => {
   useEffect(() => {
     const timer = setTimeout(() => {
       setIsLoaded(true);
-    }, 100);
+    }, LANDING_CONTENT.TYPOGRAPHY.DELAY.LOAD);
 
     return () => clearTimeout(timer);
   }, []);
@@ -41,7 +42,7 @@ const LandingTypographyAnimation = () => {
         <div
           className={`absolute -right-4 transition-opacity delay-300 ${isLoaded ? 'opacity-100' : 'opacity-0'}`}
         >
-          <I.TypographyCursor />
+          <LAI.TypographyCursor />
         </div>
       </h1>
       <div className='relative -mt-2 w-fit text-6xl font-bold tracking-tighter md:-mt-6 md:text-[140px] lg:text-[180px]'>

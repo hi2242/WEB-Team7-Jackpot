@@ -1,8 +1,13 @@
+import { useCallback, useRef, useState } from 'react';
+
+import { useNavigate } from 'react-router';
+
+import { useToastMessageContext } from '@/shared/hooks/toastMessage/useToastMessageContext';
 import {
+  useDeleteCoverLetter,
   useSharedLink,
   useSharedLinkToggle,
-} from '@/features/coverLetter/hooks/useCoverLetterQueries';
-import { useToastMessageContext } from '@/shared/hooks/toastMessage/useToastMessageContext';
+} from '@/shared/hooks/useCoverLetterQueries';
 import { useUpdateQnA } from '@/shared/hooks/useQnAQueries';
 import { reconstructTaggedText } from '@/shared/hooks/useReviewState/helpers';
 import type { Review } from '@/shared/types/review';
@@ -24,39 +29,86 @@ const useCoverLetterActions = ({
   isReviewActive,
   setIsReviewActive,
 }: UseCoverLetterActionsParams) => {
-  const { mutate: updateQnA, isPending } = useUpdateQnA();
+  const navigate = useNavigate();
+  const { mutateAsync: updateQnAAsync, isPending } = useUpdateQnA();
+  const { mutateAsync: deleteCoverLetterAsync, isPending: isDeleting } =
+    useDeleteCoverLetter();
   const { showToast } = useToastMessageContext();
 
   const { data: sharedLink, isLoading } = useSharedLink(coverLetterId);
   const { mutate: toggleLink } = useSharedLinkToggle();
 
-  const handleSave = () => {
+  const isSavingRef = useRef(false);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
+
+  const saveCurrentAnswer = async (showSuccessToast = true) => {
+    if (isPending || isSavingRef.current) return false;
+
     const qnAId = currentQna?.qnAId;
     const editedText = qnAId !== undefined ? editedAnswers[qnAId] : null;
 
-    if (qnAId === undefined) return showToast('저장할 문항이 없습니다.');
+    if (qnAId === undefined) {
+      showToast('저장할 문항이 없습니다.', false);
+      return false;
+    }
 
     if (editedText === null || editedText === undefined) {
-      return showToast('변경된 내용이 없습니다.');
+      return true;
     }
 
-    updateQnA(
-      {
+    isSavingRef.current = true;
+
+    try {
+      await updateQnAAsync({
         qnAId,
         answer: reconstructTaggedText(editedText, currentReviews),
-      },
-      {
-        onSuccess: () => showToast('저장되었습니다.', true),
-        onError: (error) => showToast(`저장에 실패했습니다: ${error.message}`),
-      },
-    );
-  };
-
-  const handleDelete = () => {
-    if (confirm('정말로 삭제하시겠습니까?')) {
-      showToast('삭제되었습니다.', true);
+      });
+      if (showSuccessToast) {
+        showToast('저장되었습니다.', true);
+      }
+      return true;
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : '알 수 없는 오류가 발생했습니다.';
+      showToast(`저장에 실패했습니다: ${message}`, false);
+      return false;
+    } finally {
+      isSavingRef.current = false;
     }
   };
+
+  const handleSave = () => {
+    void saveCurrentAnswer(true);
+  };
+
+  // 삭제 모달 열기
+  const openDeleteModal = useCallback(() => {
+    setDeletingId(coverLetterId);
+  }, [coverLetterId]);
+
+  // 삭제 모달 닫기
+  const closeDeleteModal = useCallback(() => {
+    setDeletingId(null);
+  }, []);
+
+  // 실제 삭제 실행
+  const confirmDelete = useCallback(async () => {
+    if (deletingId !== null) {
+      try {
+        await deleteCoverLetterAsync({ coverLetterId: deletingId });
+        showToast('자기소개서가 삭제되었습니다.', true);
+        setDeletingId(null);
+        navigate('/cover-letter/list');
+      } catch {
+        showToast('자기소개서 삭제에 실패했습니다.', false);
+        // 모달은 열린 상태 유지
+      }
+    }
+  }, [deletingId, deleteCoverLetterAsync, showToast, navigate]);
+
+  const handleDelete = openDeleteModal;
 
   const handleCopyLink = () => {
     if (isLoading) {
@@ -70,7 +122,12 @@ const useCoverLetterActions = ({
     }
 
     const shareLinkId = sharedLink.shareLinkId;
-    const url = `${import.meta.env.VITE_SERVICE_BASE_URL || window.location.origin}/review/${shareLinkId}`;
+    const baseUrl =
+      window.location.origin === import.meta.env.VITE_DEV_BASE_URL
+        ? import.meta.env.VITE_DEV_BASE_URL
+        : import.meta.env.VITE_SERVICE_BASE_URL;
+
+    const url = `${baseUrl || window.location.origin}/review/${shareLinkId}`;
 
     navigator.clipboard
       .writeText(url)
@@ -82,8 +139,16 @@ const useCoverLetterActions = ({
       });
   };
 
-  const handleToggleReview = () => {
+  const handleToggleReview = async () => {
     const next = !isReviewActive;
+
+    if (next) {
+      const saveSucceeded = await saveCurrentAnswer(false);
+      if (!saveSucceeded) {
+        return;
+      }
+    }
+
     setIsReviewActive(next);
     toggleLink(
       { coverLetterId, active: next },
@@ -103,6 +168,10 @@ const useCoverLetterActions = ({
     handleToggleReview,
     isPending,
     isShareDisabled: isLoading || !sharedLink?.active,
+    deletingId,
+    isDeleting,
+    closeDeleteModal,
+    confirmDelete,
   };
 };
 

@@ -1,0 +1,26 @@
+package com.jackpot.narratix.domain.controller.response;
+
+import com.jackpot.narratix.domain.entity.QnA;
+
+import java.time.LocalDateTime;
+
+public record QnAResponse(
+        Long qnAId,
+        String question,
+        String answer,
+        Integer answerSize,
+        LocalDateTime modifiedAt,
+        Boolean isScraped
+) {
+    public static QnAResponse of(QnA qnA, Boolean isScraped) {
+        String answer = (qnA.getAnswer() == null) ? "" : qnA.getAnswer();
+        return new QnAResponse(
+                qnA.getId(),
+                qnA.getQuestion(),
+                answer,
+                answer.length(),
+                qnA.getModifiedAt(),
+                isScraped
+        );
+    }
+}

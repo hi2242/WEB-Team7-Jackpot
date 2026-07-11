@@ -2,12 +2,10 @@ import { useEffect } from 'react';
 
 import RecruitFormView from '@/features/recruit/components/recruitForm/RecruitFormView';
 import { useUpdateRecruit } from '@/features/recruit/hooks/queries/useCalendarQuery';
-import {
-  useCreateCoverLetter,
-  useUpdateCoverLetter,
-} from '@/features/recruit/hooks/queries/useCoverLetterMutation';
+import { useUpdateCoverLetter } from '@/features/recruit/hooks/queries/useCoverLetterMutation';
 import { DEFAULT_DATA } from '@/shared/constants/createCoverLetter';
 import { useToastMessageContext } from '@/shared/hooks/toastMessage/useToastMessageContext';
+import { useCreateCoverLetter } from '@/shared/hooks/useCoverLetterQueries';
 import { useRecruitForm } from '@/shared/hooks/useRecruitForm';
 
 interface Props {
@@ -36,7 +34,7 @@ const RecruitFormContainer = ({ recruitId, onClose }: Props) => {
   // 5. 로딩 처리 (데이터 패칭 중일 때 깜빡임 방지용 로더)
   if (recruitId && isLoading) {
     return (
-      <div className='flex h-full items-center justify-center text-gray-400'>
+      <div className='flex h-full w-full items-center justify-center text-gray-400'>
         불러오는 중...
       </div>
     );
@@ -73,21 +71,22 @@ const RecruitFormContainer = ({ recruitId, onClose }: Props) => {
       }
 
       onClose();
-    } catch (error) {
-      console.error('작업 실패:', error);
+    } catch {
       showToast('저장에 실패했습니다. 다시 시도해주세요.', false);
     }
   };
 
   return (
-    <RecruitFormView
-      mode={recruitId ? 'EDIT' : 'CREATE'}
-      formData={formData}
-      isSubmitting={isCreating || isUpdating}
-      onChange={handleChange}
-      onSubmit={handleSubmit}
-      onClose={onClose}
-    />
+    <div className='h-full w-full overflow-y-auto'>
+      <RecruitFormView
+        mode={recruitId ? 'EDIT' : 'CREATE'}
+        formData={formData}
+        isSubmitting={isCreating || isUpdating}
+        onChange={handleChange}
+        onSubmit={handleSubmit}
+        onClose={onClose}
+      />
+    </div>
   );
 };
 
